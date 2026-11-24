@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — every pre-token protocol, priced from the snapshot</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="mark">◉</div>
+    <div>
+      <h1>Token Radar</h1>
+      <p class="sub">Every pre-token protocol, priced from the snapshot — not from a list of names.</p>
+    </div>
+  </div>
+  <div class="meta">
+    <span id="snapDate"></span>
+    <span id="modelTag"></span>
+  </div>
+</header>
+
+<section class="kpis" id="kpis" aria-label="Key figures"></section>
+<section class="integrity" id="integrity" aria-label="Self-check"></section>
+
+<nav class="tabs" aria-label="Views">
+  <button data-tab="board" class="on">Board</button>
+  <button data-tab="live">Live token</button>
+  <button data-tab="audit">Audit · 758</button>
+  <button data-tab="validation">Validation</button>
+  <button data-tab="method">Method &amp; sandbox</button>
+</nav>
+
+<section id="view-board" class="view">
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search name or slug…" aria-label="Search">
+    <select id="fCat" aria-label="Category"><option value="">All categories</option></select>
+    <select id="fChain" aria-label="Chain"><option value="">All chains</option></select>
+    <select id="fVerdict" aria-label="Verdict">
+      <option value="">All verdicts</option><option>Farm</option><option>Watch</option><option>Skip</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="fWatch"> Watchlist only</label>
+    <select id="sort" aria-label="Sort by">
+      <option value="rank">Sort: rank</option><option value="implied">Sort: implied value</option>
+      <option value="tvl">Sort: TVL</option><option value="growth">Sort: 7d growth</option>
+      <option value="age">Sort: age</option><option value="odds">Sort: launch odds</option>
+    </select>
+  </div>
+  <p class="count" id="count"></p>
+  <div class="tablewrap">
+  <table id="board">
+    <thead><tr>
+      <th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="category">Category</th>
+      <th data-k="tvl">TVL</th><th data-k="growth">7d</th><th data-k="age">Age</th>
+      <th data-k="odds">Launch odds</th><th data-k="implied">Implied value</th><th data-k="verdict">Verdict</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  </div>
+  <p class="note">Implied value = TVL × fitted category multiple × size curve × growth × maturity × launch odds. The 80% range is the conformal band from held-out residuals — wide on purpose: the multiple varies a lot across protocols, and the range says so. Click a row for the full decomposition and farm plan.</p>
+</section>
+
+<section id="view-live" class="view" hidden>
+  <h2>Live token — set aside, not ranked</h2>
+  <p class="lede">These protocols already trade: the market prices them, so the model does not. The top 50 by market cap are shown; <span id="liveCount"></span> protocols in the snapshot record a token.</p>
+  <div class="tablewrap"><table><thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Market cap</th><th>mcap / TVL</th><th>7d</th></tr></thead><tbody id="liveRows"></tbody></table></div>
+</section>
+
+<section id="view-audit" class="view" hidden>
+  <h2>Audit — all 758 protocols accounted for</h2>
+  <p class="lede">Nothing is dropped silently. Every protocol in the snapshot is one of: ranked on the board, live-token (set aside), or excluded with its reason.</p>
+  <div class="controls">
+    <select id="auditFilter" aria-label="Audit status">
+      <option value="">All 758</option><option value="ranked">Ranked</option><option value="live">Live token</option>
+      <option value="excluded-cex">Excluded: exchange</option><option value="excluded-version">Excluded: version pool</option><option value="excluded-house-rule">Excluded: house rule</option>
+    </select>
+    <input id="auditQ" type="search" placeholder="Search audit…" aria-label="Search audit">
+  </div>
+  <p class="count" id="auditCount"></p>
+  <div class="tablewrap"><table><thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Status</th></tr></thead><tbody id="auditRows"></tbody></table></div>
+</section>
+
+<section id="view-validation" class="view" hidden>
+  <h2>Validation — every term fitted, then tested held-out</h2>
+  <p class="lede">The model is fitted on the snapshot's 128 live-token comps and tested four ways, each against the starter's constant 0.25 multiple. Metric: median |log error| on market cap. A term that did not survive held-out testing was dropped — growth and age weights were never fitted at all, because they carry no signal (corr 0.012 and 0.008 with the multiple).</p>
+  <div class="tablewrap"><table id="valTable"><thead><tr><th>Test</th><th>Model</th><th>Baseline 0.25</th><th>Improvement</th><th>What it proves</th></tr></thead><tbody id="valRows"></tbody></table></div>
+  <h3>Fitted multiples by category (size-adjusted, n ≥ 3)</h3>
+  <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th></tr></thead><tbody id="catRows"></tbody></table></div>
+  <p class="note">Size curve: multiple × (TVL / $32,575,274)^−0.478 — bigger protocols trade at lower multiples (corr −0.40). Global median 0.2138 for thin categories. 80% conformal band ×13.76 from leave-one-out residuals: the honest width of the multiple's spread.</p>
+</section>
+
+<section id="view-method" class="view" hidden>
+  <h2>Method — how the number is built</h2>
+  <div class="methodgrid">
+    <div class="card">
+      <h3>The formula</h3>
+      <p class="formula">implied = TVL × catMultiple × (TVL/ref)^β × growth × maturity × odds</p>
+      <ul>
+        <li><b>catMultiple</b> — size-adjusted median mcap/TVL of live-token comps in the category (n ≥ 3), else the global median 0.2138.</li>
+        <li><b>Size curve</b> — β = −0.478 fitted by OLS on log(mcap/TVL) vs log TVL; ref TVL $32,575,274 (comps median).</li>
+        <li><b>Growth</b> — 1 + clamp(7d, −60, +120)% × 0.5. Structural, stated weight — growth does not predict the multiple.</li>
+        <li><b>Maturity</b> — 0.6 + min(age, 1095)/1095 × 0.4; unknown age counts as 365 days. Structural, not fitted.</li>
+        <li><b>Odds</b> — 1 − sigmoid(−1.2089 + 0.6141 × age in years), logistic fit on tokenized ~ age (n = 645). Falls with age: a protocol still pre-token after 3 years is unlikely to launch soon. Single cross-section, no launch dates — a model claim, not a measured hazard.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Launch odds by age</h3>
+      <svg id="oddsChart" viewBox="0 0 320 170" role="img" aria-label="Launch odds fall with age"></svg>
+      <p class="note">Share of protocols at each age that are still pre-token: 74% at 0–180 days, 60% at 180–365, 62% at 365–730, 45% at 730–1095, 21% at 1095–1460, 20% past 1460.</p>
+    </div>
+    <div class="card">
+      <h3>Farm economics</h3>
+      <ul>
+        <li>Capital tier by TVL: ≥ $1B $250 · ≥ $100M $150 · ≥ $10M $100 · else $50.</li>
+        <li>Gas per transaction by chain: Ethereum $8 · Bitcoin $3 · Solana $0.05 · other chains $0.50.</li>
+        <li>Hold: &lt; 180 days old 60 d · &lt; 365 d 45 d · older 30 d. Weekly qualifying action + claim.</li>
+        <li>Expected farmer value = implied × odds × 0.001% capture (1bp — a 5% airdrop split across ~5,000 farmers; change it in the sandbox). Verdict: <b>Farm</b> when expected value ≥ 20× gas, <b>Watch</b> ≥ 5×, else <b>Skip</b>.</li>
+        <li><span id="planShapes"></span> distinct plan shapes across the board (category × capital × hold × gas).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Model sandbox — change a constant, the board re-ranks</h3>
+      <label>Capture share <input id="sbCapture" type="number" step="0.000005" min="0" max="0.001" value="0.00001"> (farmer's share of implied value)</label>
+      <label>Growth weight <input id="sbGrowth" type="number" step="0.1" min="0" max="1" value="0.5"></label>
+      <label>Maturity floor <input id="sbMatFloor" type="number" step="0.05" min="0" max="1" value="0.6"></label>
+      <label>Maturity range <input id="sbMatRange" type="number" step="0.05" min="0" max="1" value="0.4"></label>
+      <button id="sbApply">Re-rank board</button>
+      <button id="sbReset">Reset</button>
+      <p class="note" id="sbNote">Sandbox only changes this page — board.json keeps the fitted model.</p>
+    </div>
+  </div>
+</section>
+
+<aside id="drawer" class="drawer" hidden aria-label="Protocol detail">
+  <button id="drawerClose" aria-label="Close">✕</button>
+  <div id="drawerBody"></div>
+</aside>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
