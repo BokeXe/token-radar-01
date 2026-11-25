@@ -64,7 +64,7 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-export const MODEL_VERSION = 'radar-3';
+export const MODEL_VERSION = 'radar-4';
 export const CAPTURE_SHARE = 0.00001; // a typical farmer captures 1bp of expected value (stated assumption: a 5% airdrop split across ~5,000 farmers; implied already carries launch odds, so odds are applied once)
 export const SHRINK_K = 4; // category medians shrink toward the global adjusted median with weight n/(n+SHRINK_K)
 export const CAT_MIN_N = 5; // categories with fewer comps than this use the global median
@@ -99,6 +99,12 @@ export interface Fit {
   conformal_band: number;
   conformal_by_cat: Record<string, number>;
   conformal_n: Record<string, number>;
+  // Empirical coverage of the shipped bands on the LOO residuals: the
+  // share of held-out comps whose |log error| falls inside the band the
+  // board actually prints (per-category band where priced, else global).
+  // Nominal level is 80%; this is the measured level, reported as-is.
+  conformal_coverage: number;
+  conformal_coverage_global: number;
 }
 
 export interface ModelParts {
@@ -479,6 +485,19 @@ export function fitModel(snapshot: Snapshot): Fit {
       conformalByCat[key] = Math.exp(sorted[Math.floor(0.8 * sorted.length)]!);
     }
   }
+  // Measured coverage of the shipped bands on the same LOO residuals:
+  // per-category band where priced, global band otherwise. Reported on
+  // the dashboard next to the nominal 80% so the width claim is tested,
+  // not just asserted.
+  let coveredShipped = 0;
+  let coveredGlobal = 0;
+  comps.forEach((p, i) => {
+    const band = conformalByCat[p.category ?? 'None'] ?? Math.exp(q80);
+    if (looErrs[i]! <= Math.log(band)) coveredShipped++;
+    if (looErrs[i]! <= q80) coveredGlobal++;
+  });
+  const conformalCoverage = coveredShipped / comps.length;
+  const conformalCoverageGlobal = coveredGlobal / comps.length;
   return {
     comps_n: comps.length,
     beta: full.beta,
@@ -506,6 +525,8 @@ export function fitModel(snapshot: Snapshot): Fit {
     conformal_band: Math.exp(q80),
     conformal_by_cat: conformalByCat,
     conformal_n: conformalN,
+    conformal_coverage: conformalCoverage,
+    conformal_coverage_global: conformalCoverageGlobal,
   };
 }
 

@@ -22,8 +22,13 @@
 </header>
 
 <section class="kpis" id="kpis" aria-label="Key figures"></section>
+<section class="modelstrip" id="modelStrip" aria-label="Fitted model summary"></section>
 <section class="ledger" id="ledger" aria-label="Coverage ledger"></section>
 <section class="integrity" id="integrity" aria-label="Self-check"></section>
+<details class="watchcheck" id="watchCheck">
+  <summary>Watchlist coverage — every one of the 40, with its rank</summary>
+  <div id="watchList"></div>
+</details>
 <div class="comparebar" id="compareBar" hidden aria-label="Comparison tray"></div>
 
 <nav class="tabs" aria-label="Views">
@@ -89,7 +94,7 @@
   <div class="tablewrap"><table id="valTable"><thead><tr><th>Test</th><th>Model</th><th>Baseline 0.25</th><th>Improvement</th><th>What it proves</th></tr></thead><tbody id="valRows"></tbody></table></div>
   <h3>Fitted multiples by category (median polish, shrunk n/(n+4), n ≥ 5)</h3>
   <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th><th>80% band</th></tr></thead><tbody id="catRows"></tbody></table></div>
-  <p class="note">Size curve and category multiples are fit jointly by median polish: multiple × (TVL / $32,575,274)^−0.525 — bigger protocols trade at lower multiples (corr −0.40). Category medians shrink toward the global median 0.2138 with weight n/(n+4); categories under 5 comps use the global median. 80% conformal bands come from leave-one-out residuals, priced per category where at least 8 residuals exist (global ×12.30 otherwise): the honest width of the multiple's spread, per kind.</p>
+  <p class="note">Size curve and category multiples are fit jointly by median polish: multiple × (TVL / $32,575,274)^−0.525 — bigger protocols trade at lower multiples (corr −0.40). Category medians shrink toward the global median 0.2138 with weight n/(n+4); categories under 5 comps use the global median. 80% conformal bands come from leave-one-out residuals, priced per category where at least 8 residuals exist (global ×12.30 otherwise): the honest width of the multiple's spread, per kind. <span id="coverageNote"></span></p>
 </section>
 
 <section id="view-method" class="view" hidden>

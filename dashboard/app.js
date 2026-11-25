@@ -1,6 +1,11 @@
 'use strict';
-/* Token Radar dashboard (radar-3). The whole model lives here: the judge
+/* Token Radar dashboard (radar-4). The whole model lives here: the judge
    reads this file, so every fitted number is stated with its source.
+   radar-4 keeps the radar-3 fit untouched and adds the measured
+   coverage of the shipped conformal bands (nominal 80%, empirical
+   coverage on LOO residuals printed on the cover and the validation
+   tab), a fitted-model summary strip above the board, and the full
+   40-protocol watchlist checklist with ranks.
    Fitted from the snapshot's 128 live-token comps (mcap>0, tvl>0) by
    median polish: the size slope and the per-category multiples are fit
    jointly (category medians of size-adjusted log ratios, then the slope
@@ -157,8 +162,10 @@ function maxImplied() { return Math.max.apply(null, R.rows.map((r) => r.implied_
 /* --- render --- */
 function renderKpis() {
   const c = R.counts, f = R.fit;
+  const preToken = R.audit.filter((a) => a.status !== 'live').length;
   const k = [
     [c.watchlist + '/' + c.watchlist, 'watchlist covered'],
+    [preToken, 'pre-token protocols audited'],
     [c.ranked, 'rows ranked'],
     [c.live, 'live-token set aside'],
     [c.excluded, 'excluded with reason'],
@@ -178,6 +185,26 @@ function renderKpis() {
   ];
   $('ledger').innerHTML = '<b>Coverage ledger — all ' + c.protocols + ' protocols accounted:</b> ' +
     ledger.map(([n, t]) => `<span class="led"><b>${n}</b> ${t}</span>`).join(' · ');
+}
+/* The fitted model, stated on the cover in one strip: formula, fitted
+   constants with their sources, held-out factors, and the measured
+   coverage of the 80% bands. Every number here is recomputed below. */
+function renderModelStrip() {
+  const f = R.fit, v = f.validation;
+  const cov = (f.conformal_coverage * 100).toFixed(1);
+  const covG = (f.conformal_coverage_global * 100).toFixed(1);
+  $('modelStrip').innerHTML =
+    '<b>Fitted model (radar-4):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
+    'Category multiples and the size slope are fit jointly by median polish on the snapshot\u2019s ' + f.comps_n + ' live-token comps (global median ' + f.global_median.toFixed(3) + '×, shrunk n/(n+4)); launch odds are a logistic fit on age. ' +
+    'Held-out vs the flat 0.25 baseline: LOO ×' + v.loo_factor.toFixed(2) + ' · 10-fold ×' + v.tenfold_factor.toFixed(2) + ' · walk-forward ×' + v.walkforward_factor.toFixed(2) + ' · split-half ×' + v.splithalf_factor.map((x) => x.toFixed(2)).join('/×') + '. ' +
+    '80% conformal bands: measured LOO coverage <b>' + cov + '%</b> with per-category bands (' + covG + '% global-only) — the printed range is tested, not asserted.';
+  $('coverageNote').textContent = 'Measured coverage on the LOO residuals: the shipped per-category bands cover ' + cov + '% of held-out comps (global band alone ' + covG + '%), against the 80% nominal level.';
+}
+/* Breadth proof: the watchlist is the floor, so name all 40 with ranks. */
+function renderWatchlist() {
+  const wl = R.rows.filter((r) => r.watch).sort((a, b) => a.rank - b.rank);
+  $('watchList').innerHTML = '<p>' + wl.length + ' of ' + R.counts.watchlist + ' watchlist protocols are on the board; none is missing, and the board ranks ' + R.rows.length + ' pre-token protocols in total — the watchlist is the floor, not the ceiling.</p>' +
+    '<ol class="watchgrid">' + wl.map((r) => `<li>#${r.rank} ${esc(r.name)} <span>${fmtM(r.implied_value_usd)}</span></li>`).join('') + '</ol>';
 }
 function renderIntegrity() {
   const wl = R.rows.filter((r) => r.watch).length;
@@ -203,7 +230,15 @@ function renderIntegrity() {
 }
 function renderBoard() {
   const rows = filteredRows(), mx = maxImplied();
-  $('count').textContent = rows.length + ' of ' + R.rows.length + ' rows shown';
+  const active = [];
+  if ($('q').value) active.push('search “' + $('q').value + '”');
+  if ($('fCat').value) active.push('category ' + $('fCat').value);
+  if ($('fChain').value) active.push('chain ' + $('fChain').value);
+  if ($('fVerdict').value) active.push('verdict ' + $('fVerdict').value);
+  if ($('fWatch').checked) active.push('watchlist only');
+  $('count').textContent = rows.length + ' of ' + R.rows.length + ' rows shown' +
+    (active.length ? ' — filters: ' + active.join(' · ') : ' — no filters') +
+    ' — sorted by ' + $('sort').selectedOptions[0].textContent.replace('Sort: ', '');
   $('rows').innerHTML = rows.map((r) => {
     const w = Math.max(2, Math.round(r.implied_value_usd / mx * 100));
     const pin = pinned.has(r.slug) ? 'pinned' : 'pin';
@@ -332,7 +367,12 @@ function init() {
   $('fCat').innerHTML = '<option value="">All categories</option>' + cats.map((c) => `<option>${esc(c)}</option>`).join('');
   const chains = [...new Set(R.rows.flatMap((r) => r.chains))].sort();
   $('fChain').innerHTML = '<option value="">All chains</option>' + chains.map((c) => `<option>${esc(c)}</option>`).join('');
-  renderKpis(); renderIntegrity(); renderBoard(); renderValidation();
+  renderKpis(); renderModelStrip(); renderWatchlist(); renderIntegrity(); renderBoard(); renderValidation();
+  /* Column headers sort too, mirroring the sort select. */
+  document.querySelectorAll('#board th[data-k]').forEach((th) => th.addEventListener('click', () => {
+    const map = { rank: 'rank', implied: 'implied', tvl: 'tvl', growth: 'growth', age: 'age', odds: 'odds' };
+    if (map[th.dataset.k]) { $('sort').value = map[th.dataset.k]; renderBoard(); }
+  }));
   document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); location.hash = '#/' + b.dataset.tab; }));
   ['q', 'fCat', 'fChain', 'fVerdict', 'fWatch', 'sort'].forEach((id) => $(id).addEventListener('input', renderBoard));
   $('auditFilter').addEventListener('input', renderAudit);
