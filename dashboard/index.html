@@ -22,7 +22,9 @@
 </header>
 
 <section class="kpis" id="kpis" aria-label="Key figures"></section>
+<section class="ledger" id="ledger" aria-label="Coverage ledger"></section>
 <section class="integrity" id="integrity" aria-label="Self-check"></section>
+<div class="comparebar" id="compareBar" hidden aria-label="Comparison tray"></div>
 
 <nav class="tabs" aria-label="Views">
   <button data-tab="board" class="on">Board</button>
@@ -58,7 +60,7 @@
     <tbody id="rows"></tbody>
   </table>
   </div>
-  <p class="note">Implied value = TVL × fitted category multiple × size curve × growth × maturity × launch odds. The 80% range is the conformal band from held-out residuals — wide on purpose: the multiple varies a lot across protocols, and the range says so. Click a row for the full decomposition and farm plan.</p>
+  <p class="note">Implied value = TVL × fitted category multiple × size curve × growth × maturity × launch odds. The 80% range is the conformal band from held-out residuals, priced per category where the residuals allow — wide on purpose: the multiple varies a lot across protocols, and the range says so. Click a row for the full decomposition and farm plan; pin up to three rows to compare them side by side.</p>
 </section>
 
 <section id="view-live" class="view" hidden>
@@ -85,9 +87,9 @@
   <h2>Validation — every term fitted, then tested held-out</h2>
   <p class="lede">The model is fitted on the snapshot's 128 live-token comps and tested four ways, each against the starter's constant 0.25 multiple. Metric: median |log error| on market cap. A term that did not survive held-out testing was dropped — growth and age weights were never fitted at all, because they carry no signal (corr 0.012 and 0.008 with the multiple).</p>
   <div class="tablewrap"><table id="valTable"><thead><tr><th>Test</th><th>Model</th><th>Baseline 0.25</th><th>Improvement</th><th>What it proves</th></tr></thead><tbody id="valRows"></tbody></table></div>
-  <h3>Fitted multiples by category (size-adjusted, n ≥ 3)</h3>
-  <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th></tr></thead><tbody id="catRows"></tbody></table></div>
-  <p class="note">Size curve: multiple × (TVL / $32,575,274)^−0.478 — bigger protocols trade at lower multiples (corr −0.40). Global median 0.2138 for thin categories. 80% conformal band ×13.76 from leave-one-out residuals: the honest width of the multiple's spread.</p>
+  <h3>Fitted multiples by category (median polish, shrunk n/(n+4), n ≥ 5)</h3>
+  <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th><th>80% band</th></tr></thead><tbody id="catRows"></tbody></table></div>
+  <p class="note">Size curve and category multiples are fit jointly by median polish: multiple × (TVL / $32,575,274)^−0.525 — bigger protocols trade at lower multiples (corr −0.40). Category medians shrink toward the global median 0.2138 with weight n/(n+4); categories under 5 comps use the global median. 80% conformal bands come from leave-one-out residuals, priced per category where at least 8 residuals exist (global ×12.30 otherwise): the honest width of the multiple's spread, per kind.</p>
 </section>
 
 <section id="view-method" class="view" hidden>
@@ -97,8 +99,8 @@
       <h3>The formula</h3>
       <p class="formula">implied = TVL × catMultiple × (TVL/ref)^β × growth × maturity × odds</p>
       <ul>
-        <li><b>catMultiple</b> — size-adjusted median mcap/TVL of live-token comps in the category (n ≥ 3), else the global median 0.2138.</li>
-        <li><b>Size curve</b> — β = −0.478 fitted by OLS on log(mcap/TVL) vs log TVL; ref TVL $32,575,274 (comps median).</li>
+        <li><b>catMultiple</b> — median mcap/TVL of live-token comps in the category, fit jointly with the size curve by median polish and shrunk toward the global median with weight n/(n+4); categories under 5 comps use the global median 0.2138.</li>
+        <li><b>Size curve</b> — β = −0.525 from the same median polish (slope of category-demeaned log ratios on log TVL); ref TVL $32,575,274 (comps median).</li>
         <li><b>Growth</b> — 1 + clamp(7d, −60, +120)% × 0.5. Structural, stated weight — growth does not predict the multiple.</li>
         <li><b>Maturity</b> — 0.6 + min(age, 1095)/1095 × 0.4; unknown age counts as 365 days. Structural, not fitted.</li>
         <li><b>Odds</b> — 1 − sigmoid(−1.2089 + 0.6141 × age in years), logistic fit on tokenized ~ age (n = 645). Falls with age: a protocol still pre-token after 3 years is unlikely to launch soon. Single cross-section, no launch dates — a model claim, not a measured hazard.</li>
@@ -115,8 +117,8 @@
         <li>Capital tier by TVL: ≥ $1B $250 · ≥ $100M $150 · ≥ $10M $100 · else $50.</li>
         <li>Gas per transaction by chain: Ethereum $8 · Bitcoin $3 · Solana $0.05 · other chains $0.50.</li>
         <li>Hold: &lt; 180 days old 60 d · &lt; 365 d 45 d · older 30 d. Weekly qualifying action + claim.</li>
-        <li>Expected farmer value = implied × odds × 0.001% capture (1bp — a 5% airdrop split across ~5,000 farmers; change it in the sandbox). Verdict: <b>Farm</b> when expected value ≥ 20× gas, <b>Watch</b> ≥ 5×, else <b>Skip</b>.</li>
-        <li><span id="planShapes"></span> distinct plan shapes across the board (category × capital × hold × gas).</li>
+        <li>Expected farmer value = implied × 0.001% capture (1bp — a 5% airdrop split across ~5,000 farmers; change it in the sandbox). Implied already carries the launch odds, so odds are never applied twice. Verdict: <b>Farm</b> when expected value ≥ 20× gas, <b>Watch</b> ≥ 5×, else <b>Skip</b>.</li>
+        <li><span id="planShapes"></span> distinct plan shapes across the board (category × chain × capital × hold × gas × verdict). Pin up to three rows on the board to compare them side by side.</li>
       </ul>
     </div>
     <div class="card">

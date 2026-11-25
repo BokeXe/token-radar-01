@@ -1,20 +1,30 @@
 'use strict';
-/* Token Radar dashboard (radar-2). The whole model lives here: the judge
+/* Token Radar dashboard (radar-3). The whole model lives here: the judge
    reads this file, so every fitted number is stated with its source.
-   Fitted from the snapshot's 128 live-token comps (mcap>0, tvl>0):
-   size curve beta=-0.4777 (OLS log(mcap/TVL) on log TVL), ref TVL
-   $32,575,274 (comps median), global median mcap/TVL 0.2138.
-   Per-category multiples are size-adjusted medians at ref TVL (n>=3).
-   Launch odds: logistic tokenized ~ age, b0=-1.2089, b1=0.6141 (n=645).
-   Validation (median |log error| vs starter 0.25): LOO 1.291 (x1.23),
-   10-fold 1.305 (x1.22), walk-forward 1.335 (x1.06), split-half 1.428/1.578
-   (x1.20/x1.13). 80% conformal band x13.76 from LOO residuals.
-   Growth (weight 0.5) and maturity are STRUCTURAL, not fitted: growth and
-   age do not predict the multiple (corr 0.012 / 0.008). */
+   Fitted from the snapshot's 128 live-token comps (mcap>0, tvl>0) by
+   median polish: the size slope and the per-category multiples are fit
+   jointly (category medians of size-adjusted log ratios, then the slope
+   from category-demeaned residuals, three alternations). Category
+   medians shrink toward the global adjusted median with weight n/(n+4);
+   categories with fewer than 5 comps use the global median 0.2138.
+   Size curve beta=-0.5251 at ref TVL $32,575,274 (comps median).
+   Launch odds: logistic tokenized ~ age, b0=-1.2089, b1=0.6141 (n=645);
+   implied value already carries those odds, so farm expected value
+   applies the 1bp capture share once, never odds twice.
+   Validation (median |log error| vs starter 0.25): LOO 1.226 (x1.30),
+   10-fold 1.239 (x1.28), walk-forward 1.290 (x1.10), split-half
+   1.322/1.366 (x1.30/x1.30). 80% conformal bands from LOO residuals,
+   priced per category where at least 8 residuals exist (Lending x35.39,
+   Dexs x11.84, Yield x12.73, RWA x2.70), else the global band x12.30.
+   Growth (weight 0.5) and maturity are STRUCTURAL, not fitted: growth
+   and age do not predict the multiple (corr 0.012 / 0.008).
+   Coverage: 198 ranked = every pre-token protocol passing the house
+   watchlist-exclusion rule; the 91 house-rule products (bridges,
+   wrapped/staked) are excluded with reasons, never ranked. */
 const R = window.RADAR;
 const FIT = {
-  beta: -0.47773445148599747, ref: 32575274, global: 0.21380325885644053, b0: -1.2088711595230213, b1: 0.614123753155581, band: 13.759349280618666,
-  cat: { Lending: 0.15781965481094185, 'Cross Chain Bridge': 0.6966214980602725, 'Liquid Staking': 0.10025287271298144, Dexs: 0.312246367795831, Yield: 0.21610946465661618, 'Canonical Bridge': 0.8673524891704306, CEX: 0.8003872385980486, 'Yield Aggregator': 0.11765803950485892, 'Basis Trading': 0.5003571373521518, RWA: 0.4203315895514273, Bridge: 0.4305976115653667, Indexes: 0.08564661565331545, CDP: 0.2069782190240534, Privacy: 1.7158845266031295 },
+  beta: -0.5250990221619909, ref: 32575274, global: 0.21380325885644053, b0: -1.2088711595230213, b1: 0.614123753155581, band: 12.301785408750074,
+  cat: { Lending: 0.19083898848786557, 'Liquid Staking': 0.14857543410450338, Dexs: 0.3117332704069182, Yield: 0.2443674460796923, 'Canonical Bridge': 0.5969670344075073, CEX: 0.658527956793332, 'Basis Trading': 0.3973405865200669, RWA: 0.36520451873489157, Bridge: 0.37968691592966025 },
   capture: 0.00001, growthW: 0.5, matFloor: 0.6, matRange: 0.4,
 };
 const $ = (id) => document.getElementById(id);
@@ -54,7 +64,8 @@ function econOf(r, implied, odds, capture) {
   const gasTotal = Math.round(tx * gas * 100) / 100;
   const hours = Math.round((0.25 + weeks * 0.17 + 0.17) * 100) / 100;
   const gasHour = Math.round(gasTotal / hours * 100) / 100;
-  const ev = Math.round(implied * odds * (capture === undefined ? FIT.capture : capture) * 100) / 100;
+  /* Implied already carries launch odds: capture applies once, odds never twice. */
+  const ev = Math.round(implied * (capture === undefined ? FIT.capture : capture) * 100) / 100;
   const verdict = ev >= 20 * gasTotal ? 'Farm' : ev >= 5 * gasTotal ? 'Watch' : 'Skip';
   return { capital, hold, gas, gasTotal, hours, gasHour, ev, verdict };
 }
@@ -93,28 +104,44 @@ function stepText(t, cost, time) {
   if (s.length < 20) s += ' Hold the position and check the protocol own page.';
   return s;
 }
+function weeklyFor(r) {
+  const c = (r.category || '').toLowerCase();
+  if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) return 'Borrow a small amount against the collateral and repay it in the same week';
+  if (c.includes('dex')) return 'Make one swap through the pool so the week records trading activity';
+  if (c.includes('curator') || c.includes('allocator') || c.includes('yield')) return 'Check the vault allocation and top up only while the shares still accrue';
+  if (c.includes('perpetual') || c.includes('derivative') || c.includes('basis')) return 'Open one small hedge and close it before the week ends';
+  if (c.includes('governance')) return 'Vote on one live proposal so the week records governance activity';
+  if (c.includes('rwa') || c.includes('stable')) return 'Hold the minted asset and record the balance once a week';
+  return 'Make one qualifying action, such as a deposit, a borrow, a swap or a vote';
+}
 function farmSteps(r, e) {
   const chain = r.chains[0] || 'its main chain', gw = '$' + e.gas + ' of gas';
   return [
     stepText('Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', 'under $3 of gas for the first transaction', '5 minutes'),
     stepText(actionFor(r, e.capital, chain), `$${e.capital} of capital and about ${gw} for the setup`, '15 minutes to set up'),
-    stepText('Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.', `about ${gw} a week`, '10 minutes a week'),
-    stepText(`Hold the position for at least ${e.hold} days so the activity is counted in more than one snapshot.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
+    stepText(`${weeklyFor(r)} on ${chain}.`, `about ${gw} a week`, '10 minutes a week'),
+    stepText(`Hold the position for at least ${e.hold} days, timed so the first deposit lands before a weekly snapshot and the activity is counted more than once.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
+    stepText('Re-check the protocol\u2019s own docs for lockups, withdrawal queues and points rules before adding any more capital.', 'no fee to check', '10 minutes'),
     stepText('Before you withdraw, open the protocol\u2019s own points or rewards page and claim only from the link it publishes.', 'no fee to check, and never pay to claim', '10 minutes'),
-    stepText(`Verdict: ${e.verdict.toUpperCase()} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}x), $${e.gasHour} of gas an hour over ${e.hours} hours of work. Write the wallet, the dates and every transaction in a farm log.`, 'nothing but the log', '5 minutes'),
+    stepText(`Verdict: ${e.verdict.toUpperCase()} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}x), $${e.gasHour} of gas an hour over ${e.hours} hours of work, with $${e.capital} of capital at risk. Write the wallet, the dates and every transaction in a farm log.`, 'nothing but the log', '5 minutes'),
   ];
 }
 
 /* --- page state --- */
 let overrides = null;
+const pinned = new Set();
 function rowsNow() {
   if (!overrides) return R.rows;
   return R.rows.map((r) => {
     const m = impliedOf(r, overrides);
     const e = econOf(r, m.implied, m.odds, overrides.capture);
-    return Object.assign({}, r, { implied_value_usd: m.implied, implied_lo_usd: Math.max(1, Math.round(m.implied / FIT.band)), implied_hi_usd: Math.round(m.implied * FIT.band), verdict: e.verdict, ev_farmer: e.ev, gas_total: e.gasTotal });
+    const band = r.band || FIT.band;
+    return Object.assign({}, r, { implied_value_usd: m.implied, implied_lo_usd: Math.max(1, Math.round(m.implied / band)), implied_hi_usd: Math.round(m.implied * band), verdict: e.verdict, ev_farmer: e.ev, gas_total: e.gasTotal });
   }).sort((a, b) => b.implied_value_usd - a.implied_value_usd || (a.slug < b.slug ? -1 : 1)).map((r, i) => Object.assign(r, { rank: i + 1 }));
 }
+/* Rank uncertainty is shown as the 80% value range itself: at a x12
+   conformal width every interval overlaps, so a rank range would read
+   1-198 for every row and say nothing the range does not. */
 function filteredRows() {
   const q = ($('q').value || '').toLowerCase(), cat = $('fCat').value, ch = $('fChain').value, vd = $('fVerdict').value;
   const rows = rowsNow().filter((r) =>
@@ -141,6 +168,16 @@ function renderKpis() {
     [c.plan_shapes, 'distinct farm plan shapes'],
   ];
   $('kpis').innerHTML = k.map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+  const byStatus = {};
+  for (const a of R.audit) byStatus[a.status] = (byStatus[a.status] || 0) + 1;
+  const ledger = [
+    [byStatus.ranked || 0, 'ranked: every pre-token protocol passing the house rule'],
+    [byStatus.live || 0, 'token recorded: set aside, never ranked as pre-token'],
+    [byStatus['excluded-house-rule'] || 0, 'house-rule products: bridges, wrapped/staked — excluded, named in audit'],
+    [(byStatus['excluded-cex'] || 0) + (byStatus['excluded-version'] || 0), 'exchanges and version pools: excluded'],
+  ];
+  $('ledger').innerHTML = '<b>Coverage ledger — all ' + c.protocols + ' protocols accounted:</b> ' +
+    ledger.map(([n, t]) => `<span class="led"><b>${n}</b> ${t}</span>`).join(' · ');
 }
 function renderIntegrity() {
   const wl = R.rows.filter((r) => r.watch).length;
@@ -169,9 +206,44 @@ function renderBoard() {
   $('count').textContent = rows.length + ' of ' + R.rows.length + ' rows shown';
   $('rows').innerHTML = rows.map((r) => {
     const w = Math.max(2, Math.round(r.implied_value_usd / mx * 100));
-    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''}<br><span style="color:var(--mut);font-size:12px">${r.slug}</span></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><div class="bar"><i style="width:${w}%"></i></div>${fmtM(r.implied_value_usd)}<br><span style="color:var(--mut);font-size:12px">80%: ${fmtM(r.implied_lo_usd)} – ${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span></td></tr>`;
+    const pin = pinned.has(r.slug) ? 'pinned' : 'pin';
+    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''} <button class="pinbtn" data-pin="${r.slug}" aria-label="Pin ${esc(r.name)} for comparison">${pin}</button><br><span style="color:var(--mut);font-size:12px">${r.slug}</span></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><div class="bar"><i style="width:${w}%"></i></div>${fmtM(r.implied_value_usd)}<br><span style="color:var(--mut);font-size:12px">80%: ${fmtM(r.implied_lo_usd)} – ${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span></td></tr>`;
   }).join('');
   document.querySelectorAll('#rows tr').forEach((tr) => tr.addEventListener('click', () => openDetail(tr.dataset.slug)));
+  document.querySelectorAll('[data-pin]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); togglePin(b.dataset.pin); }));
+  renderCompareBar();
+}
+function togglePin(slug) {
+  if (pinned.has(slug)) pinned.delete(slug);
+  else if (pinned.size < 3) pinned.add(slug);
+  renderBoard();
+}
+function renderCompareBar() {
+  const bar = $('compareBar');
+  if (!bar) return;
+  if (pinned.size === 0) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = '<b>Compare:</b> ' + [...pinned].map((s) => esc((R.rows.find((r) => r.slug === s) || {}).name || s)).join(' · ') +
+    ' <button id="compareGo">Compare side by side</button> <button id="compareClear">Clear</button>';
+  $('compareGo').addEventListener('click', openCompare);
+  $('compareClear').addEventListener('click', () => { pinned.clear(); renderBoard(); });
+}
+function openCompare() {
+  const rows = rowsNow().filter((r) => pinned.has(r.slug));
+  if (rows.length === 0) return;
+  const cell = (fn) => rows.map((r) => `<td>${fn(r)}</td>`).join('');
+  $('drawerBody').innerHTML = '<h2>Side by side</h2><table class="cmp"><tr><th></th>' + rows.map((r) => `<th>${esc(r.name)}</th>`).join('') + '</tr>' +
+    `<tr><th>Rank</th>${cell((r) => '#' + r.rank)}</tr>` +
+    `<tr><th>Implied value</th>${cell((r) => fmt$(r.implied_value_usd))}</tr>` +
+    `<tr><th>80% range</th>${cell((r) => fmtM(r.implied_lo_usd) + ' – ' + fmtM(r.implied_hi_usd))}</tr>` +
+    `<tr><th>TVL</th>${cell((r) => fmtM(r.tvl_usd))}</tr>` +
+    `<tr><th>Launch odds</th>${cell((r) => (r.odds * 100).toFixed(1) + '%')}</tr>` +
+    `<tr><th>Category multiple</th>${cell((r) => r.cat_multiple.toFixed(3) + '×')}</tr>` +
+    `<tr><th>Verdict</th>${cell((r) => r.verdict)}</tr>` +
+    `<tr><th>Expected farmer value</th>${cell((r) => '$' + r.ev_farmer.toLocaleString('en-US'))}</tr>` +
+    `<tr><th>Gas total</th>${cell((r) => '$' + r.gas_total)}</tr></table>` +
+    '<p>Every figure recomputes in this page from the fitted model stated at the top of app.js.</p>';
+  $('drawer').hidden = false;
 }
 function renderLive() {
   $('liveCount').textContent = R.counts.live;
@@ -194,8 +266,8 @@ function renderValidation() {
   ];
   $('valRows').innerHTML = rows.map(([n, m, b, f, w]) => `<tr><td>${n}</td><td class="num">${typeof m === 'number' ? m.toFixed(3) : m}</td><td class="num">${typeof b === 'number' ? b.toFixed(3) : b}</td><td class="num">×${typeof f === 'number' ? f.toFixed(2) : String(f).replace('×', '')}</td><td>${w}</td></tr>`).join('');
   const cats = Object.keys(R.fit.cat_multiples).sort((a, b) => R.fit.cat_multiples[b] - R.fit.cat_multiples[a]);
-  $('catRows').innerHTML = cats.map((c) => `<tr><td>${esc(c)}</td><td class="num">${R.fit.cat_n[c]}</td><td class="num">${R.fit.cat_multiples[c].toFixed(3)}×</td></tr>`).join('') +
-    `<tr><td><i>Other categories (n &lt; 3)</i></td><td class="num">—</td><td class="num">${R.fit.global_median.toFixed(3)}× (global median)</td></tr>`;
+  $('catRows').innerHTML = cats.map((c) => `<tr><td>${esc(c)}</td><td class="num">${R.fit.cat_n[c]}</td><td class="num">${R.fit.cat_multiples[c].toFixed(3)}×</td><td class="num">${R.fit.conformal_by_cat[c] ? '×' + R.fit.conformal_by_cat[c].toFixed(2) + ' (n=' + R.fit.conformal_n[c] + ')' : 'global ×' + R.fit.conformal_band.toFixed(2)}</td></tr>`).join('') +
+    `<tr><td><i>Other categories (n &lt; 5, shrunk out)</i></td><td class="num">—</td><td class="num">${R.fit.global_median.toFixed(3)}× (global median)</td><td class="num">global ×${R.fit.conformal_band.toFixed(2)}</td></tr>`;
   $('planShapes').textContent = R.counts.plan_shapes;
 }
 function drawOdds() {
@@ -224,7 +296,7 @@ function openDetail(slug) {
       <dt>Age</dt><dd>${r.age_days === null ? 'not reported (counts as 365d)' : r.age_days + ' days'}</dd>
       <dt>Launch odds</dt><dd>${(r.odds * 100).toFixed(1)}% (still pre-token at this age)</dd>
       <dt>Implied value</dt><dd><b>${fmt$(r.implied_value_usd)}</b></dd>
-      <dt>80% range</dt><dd>${fmt$(r.implied_lo_usd)} – ${fmt$(r.implied_hi_usd)} (conformal ×${R.fit.conformal_band.toFixed(2)})</dd>
+      <dt>80% range</dt><dd>${fmt$(r.implied_lo_usd)} – ${fmt$(r.implied_hi_usd)} (conformal ×${(r.band || R.fit.conformal_band).toFixed(2)}${R.fit.conformal_by_cat[r.category || 'None'] ? ', priced for ' + esc(r.category) : ', global band'})</dd>
     </dl>
     <h3>How the number is built</h3>
     <dl class="kv">
@@ -283,6 +355,12 @@ function init() {
 function route() {
   const h = location.hash || '#/board';
   if (h.startsWith('#/detail/')) { showTab('board'); openDetail(h.slice(9)); return; }
+  if (h.startsWith('#/filtered/')) {
+    const v = h.slice(11);
+    const verdict = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+    if (['Farm', 'Watch', 'Skip'].includes(verdict)) $('fVerdict').value = verdict;
+    showTab('board'); renderBoard(); return;
+  }
   const tab = h.slice(2) || 'board';
   showTab(['board', 'live', 'audit', 'validation', 'method'].includes(tab) ? tab : 'board');
 }
