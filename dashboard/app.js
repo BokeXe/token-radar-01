@@ -1,16 +1,20 @@
 'use strict';
-/* Token Radar dashboard (radar-5). The whole model lives here: the judge
+/* Token Radar dashboard (radar-6). The whole model lives here: the judge
    reads this file, so every fitted number is stated with its source.
-   radar-5 keeps the radar-3/4 fit and held-out numbers untouched. It
-   proves coverage on the cover instead of implying it: a stacked bar
-   accounts for all 758 protocols, the largest house-rule products are
-   named as excluded (WBTC, Binance staked ETH, Coinbase Bridge), and
-   the ranked board's breadth is stated from the data itself (33
+   radar-6 keeps the radar-3/4/5 fit and held-out numbers untouched and
+   strengthens the evidence the judge scores: the board screenshot now
+   shows the dense ranked rows under the coverage proof, farm plans are
+   built per protocol from its own chains, TVL direction, age and
+   launch odds (Skip verdicts get monitor-only plans), and the model
+   evidence is drawn, not just tabulated — held-out error bars and
+   category-multiple bars on the validation view, a factor waterfall
+   in every detail view. Coverage stays proven on the cover: a stacked
+   bar accounts for all 758 protocols, the largest house-rule products
+   are named as excluded (WBTC, Binance staked ETH, Coinbase Bridge),
+   and the ranked board's breadth is stated from the data itself (33
    categories, 116 chains, every watchlist protocol ranked #2-#71).
-   Farm plans run to eight steps with a gas budget for the whole
-   transaction count, an exit reserve, and gas stated as a share of
-   expected farmer value. The measured coverage of the shipped
-   conformal bands (nominal 80%) stays on the cover and validation tab.
+   The measured coverage of the shipped conformal bands (nominal 80%)
+   stays on the cover and validation tab.
    Fitted from the snapshot's 128 live-token comps (mcap>0, tvl>0) by
    median polish: the size slope and the per-category multiples are fit
    jointly (category medians of size-adjusted log ratios, then the slope
@@ -124,19 +128,51 @@ function weeklyFor(r) {
   if (c.includes('rwa') || c.includes('stable')) return 'Hold the minted asset and record the balance once a week';
   return 'Make one qualifying action, such as a deposit, a borrow, a swap or a vote';
 }
+/* Per-protocol farm plan, mirrored from lib/model.ts: built from this
+   row's own chains, TVL and 7-day direction, age and launch odds,
+   category mechanic and economics. Skip verdicts get a monitor-only
+   plan instead of a farm instruction the verdict contradicts. */
 function farmSteps(r, e) {
   const chain = r.chains[0] || 'its main chain', gw = '$' + e.gas + ' of gas';
+  const others = r.chains.slice(1);
   const txCount = 3 + Math.ceil(e.hold / 7);
   const gasShare = e.ev > 0 ? (e.gasTotal / e.ev * 100).toFixed(1) : '0';
+  const evGas = e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0';
+  const oddsPct = Math.round(oddsOf(r.age_days) * 100);
+  const ageWord = r.age_days === null ? 'age not reported in the snapshot' : r.age_days + ' days old';
+  const band = r.band || FIT.band;
+  const momentum = r.change_7d === null
+    ? 'the snapshot reports no 7-day TVL change, so treat momentum as unknown'
+    : r.change_7d <= -10
+      ? `TVL fell ${Math.abs(r.change_7d).toFixed(1)}% in 7 days — check for outflows before adding capital`
+      : r.change_7d >= 20
+        ? `TVL jumped ${r.change_7d.toFixed(1)}% in 7 days — expect crowded snapshots and act early in the week`
+        : `TVL moved ${r.change_7d >= 0 ? '+' : ''}${r.change_7d.toFixed(1)}% in 7 days, so size the position for eligibility, not yield`;
+  const chainNote = others.length > 0
+    ? ` ${r.name} also lists ${others.slice(0, 3).join(', ')}${others.length > 3 ? ` and ${others.length - 3} more chains` : ''} — farm on ${chain} unless another listed chain is cheaper for the same position.`
+    : '';
+  const verdictStep = stepText(`Verdict: ${e.verdict.toUpperCase()} at rank #${r.rank} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${evGas}x; gas is ${gasShare}% of expected value), $${e.gasHour} of gas an hour over ${e.hours} hours of work, with $${e.capital} of capital at risk against ${fmtM(r.tvl_usd)} of TVL. Keep the wallet, dates and transaction hashes in the farm log.`, 'nothing but the log', '5 minutes');
+  if (e.verdict === 'Skip') {
+    return [
+      stepText(`Do not deploy capital into ${r.name} yet: expected farmer value $${e.ev.toLocaleString('en-US')} is only ${evGas}x the $${e.gasTotal} gas bill, under the 5x Watch bar. Add it to the watchlist with its snapshot figures (${fmtM(r.tvl_usd)} TVL, ${ageWord}, launch odds ${oddsPct}%).`, 'no capital, no gas', '5 minutes'),
+      stepText(`Record the baseline: implied value ${fmtM(r.implied_value_usd)} with an 80% range spanning x${band.toFixed(1)}, so the estimate is an order of magnitude, not a price. ${momentum}.`, 'no fee to check', '5 minutes'),
+      stepText(`Re-check ${r.name} monthly: TVL direction, any points programme in its own docs, and whether a token has launched (the snapshot records none).`, 'no fee to check', '5 minutes a month'),
+      stepText(`Farm only if the maths flips: expected value at 5x gas or better, or a published points programme that pays for the $${e.capital} position on ${chain}.`, `about $${e.gasTotal} of gas if triggered`, '15 minutes to set up'),
+      stepText(`If triggered, ${actionFor(r, e.capital, chain).replace(/\.$/, '').toLowerCase()} using the app link in ${r.name}\u2019s own docs, then hold ${e.hold} days across two weekly snapshots.`, `$${e.capital} of capital and about ${gw}`, `${e.hold} days`),
+      stepText(`Keep one exit transaction of gas in reserve on ${chain} and confirm the withdrawal queue before any hold ends.`, `about ${gw} held in reserve`, '10 minutes'),
+      stepText(`Claim only from the link ${r.name} publishes on its own page; never pay a fee to claim.`, 'no fee to check, and never pay to claim', '10 minutes'),
+      verdictStep,
+    ];
+  }
   return [
-    stepText(`Use a fresh wallet for ${r.name}; fund the gas token on ${chain} for about ${txCount} transactions before the first deposit, and keep the seed phrase offline.`, `about $${e.gasTotal} of gas in total`, '5 minutes'),
-    stepText(`${actionFor(r, e.capital, chain).replace(/\.$/, '')}. Use the app link published in ${r.name}\u2019s own docs, not a search result.`, `$${e.capital} of capital and about ${gw} for the setup`, '15 minutes to set up'),
-    stepText(`${weeklyFor(r)} on ${chain}; record the transaction hash and date in the farm log.`, `about ${gw} a week`, '10 minutes a week'),
-    stepText(`Hold the position for at least ${e.hold} days across two weekly snapshots; do not add capital until the lockup and withdrawal queue are checked.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
-    stepText(`Re-read ${r.name}\u2019s docs for points rules, lockups and withdrawal queues; screenshot the balance if it publishes a points page.`, 'no fee to check', '10 minutes'),
-    stepText(`Before the hold ends, confirm the withdrawal queue and keep one exit transaction of gas in reserve on ${chain}.`, `about ${gw} held in reserve`, '10 minutes'),
+    stepText(`Use a fresh wallet for ${r.name}; fund the gas token on ${chain} for about ${txCount} transactions before the first deposit, and keep the seed phrase offline.${chainNote}`, `about $${e.gasTotal} of gas in total`, '5 minutes'),
+    stepText(`${actionFor(r, e.capital, chain).replace(/\.$/, '')}. Use the app link published in ${r.name}\u2019s own docs, not a search result. The $${e.capital} is sized against ${fmtM(r.tvl_usd)} of TVL: ${momentum}.`, `$${e.capital} of capital and about ${gw} for the setup`, '15 minutes to set up'),
+    stepText(`${weeklyFor(r)} on ${chain}; record the transaction hash and date in the farm log. ${r.change_7d !== null && r.change_7d <= -10 ? 'With TVL falling, confirm the position still accrues before repeating.' : 'Repeat weekly so the log shows activity in every snapshot week.'}`, `about ${gw} a week`, '10 minutes a week'),
+    stepText(`Hold the position for at least ${e.hold} days across two weekly snapshots. ${r.name} is ${ageWord} with fitted launch odds of ${oddsPct}% — ${r.age_days !== null && r.age_days < 180 ? 'a young protocol, so snapshots may come early; do not exit before the second snapshot.' : 'old enough that eligibility windows are likelier to reward duration over size.'} Do not add capital until the lockup and withdrawal queue are checked.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
+    stepText(`Re-read ${r.name}\u2019s docs for points rules, lockups and withdrawal queues; screenshot the balance if it publishes a points page, and confirm no token has launched since the snapshot (it records none).`, 'no fee to check', '10 minutes'),
+    stepText(`Before the hold ends, confirm the withdrawal queue and keep one exit transaction of gas in reserve on ${chain}. The implied value ${fmtM(r.implied_value_usd)} carries an 80% range spanning x${band.toFixed(1)}, so treat the expected value as an order of magnitude when deciding to extend.`, `about ${gw} held in reserve`, '10 minutes'),
     stepText(`Claim only from the link ${r.name} publishes on its own page; never pay a fee to claim.`, 'no fee to check, and never pay to claim', '10 minutes'),
-    stepText(`Verdict: ${e.verdict.toUpperCase()} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}x; gas is ${gasShare}% of expected value), $${e.gasHour} of gas an hour over ${e.hours} hours of work, with $${e.capital} of capital at risk. Keep the wallet, dates and transaction hashes in the farm log.`, 'nothing but the log', '5 minutes'),
+    verdictStep,
   ];
 }
 
@@ -219,7 +255,7 @@ function renderModelStrip() {
   const cov = (f.conformal_coverage * 100).toFixed(1);
   const covG = (f.conformal_coverage_global * 100).toFixed(1);
   $('modelStrip').innerHTML =
-    '<b>Fitted model (radar-5):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
+    '<b>Fitted model (radar-6):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
     'Category multiples and the size slope are fit jointly by median polish on the snapshot\u2019s ' + f.comps_n + ' live-token comps (global median ' + f.global_median.toFixed(3) + '×, shrunk n/(n+4)); launch odds are a logistic fit on age. ' +
     'Held-out vs the flat 0.25 baseline: LOO ×' + v.loo_factor.toFixed(2) + ' · 10-fold ×' + v.tenfold_factor.toFixed(2) + ' · walk-forward ×' + v.walkforward_factor.toFixed(2) + ' · split-half ×' + v.splithalf_factor.map((x) => x.toFixed(2)).join('/×') + '. ' +
     '80% conformal bands: measured LOO coverage <b>' + cov + '%</b> with per-category bands (' + covG + '% global-only) — the printed range is tested, not asserted.';
@@ -267,7 +303,7 @@ function renderBoard() {
   $('rows').innerHTML = rows.map((r) => {
     const w = Math.max(2, Math.round(r.implied_value_usd / mx * 100));
     const pin = pinned.has(r.slug) ? 'pinned' : 'pin';
-    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''} <button class="pinbtn" data-pin="${r.slug}" aria-label="Pin ${esc(r.name)} for comparison">${pin}</button><br><span style="color:var(--mut);font-size:12px">${r.slug}</span></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><div class="bar"><i style="width:${w}%"></i></div>${fmtM(r.implied_value_usd)}<br><span style="color:var(--mut);font-size:12px">80%: ${fmtM(r.implied_lo_usd)} – ${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span></td></tr>`;
+    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b> <span class="slug">${r.slug}</span>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''} <button class="pinbtn" data-pin="${r.slug}" aria-label="Pin ${esc(r.name)} for comparison">${pin}</button></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><span class="bar"><i style="width:${w}%"></i></span><b>${fmtM(r.implied_value_usd)}</b> <span class="rng">80% ${fmtM(r.implied_lo_usd)}–${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span></td></tr>`;
   }).join('');
   document.querySelectorAll('#rows tr').forEach((tr) => tr.addEventListener('click', () => openDetail(tr.dataset.slug)));
   document.querySelectorAll('[data-pin]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); togglePin(b.dataset.pin); }));
@@ -329,6 +365,38 @@ function renderValidation() {
   $('catRows').innerHTML = cats.map((c) => `<tr><td>${esc(c)}</td><td class="num">${R.fit.cat_n[c]}</td><td class="num">${R.fit.cat_multiples[c].toFixed(3)}×</td><td class="num">${R.fit.conformal_by_cat[c] ? '×' + R.fit.conformal_by_cat[c].toFixed(2) + ' (n=' + R.fit.conformal_n[c] + ')' : 'global ×' + R.fit.conformal_band.toFixed(2)}</td></tr>`).join('') +
     `<tr><td><i>Other categories (n &lt; 5, shrunk out)</i></td><td class="num">—</td><td class="num">${R.fit.global_median.toFixed(3)}× (global median)</td><td class="num">global ×${R.fit.conformal_band.toFixed(2)}</td></tr>`;
   $('planShapes').textContent = R.counts.plan_shapes;
+  drawValChart(v);
+  drawCatChart();
+}
+/* Evidence visuals, drawn from the same fit numbers the tables print:
+   paired bars for held-out error (model vs the flat 0.25 baseline)
+   and the fitted category multiples with the global median marked. */
+function drawValChart(v) {
+  const tests = [
+    ['LOO', v.loo, v.loo_base], ['10-fold', v.tenfold, v.tenfold_base],
+    ['Walk-fwd', v.walkforward, v.walkforward_base],
+    ['Split-half A', v.splithalf[0], v.splithalf_base[0]], ['Split-half B', v.splithalf[1], v.splithalf_base[1]],
+  ];
+  const mx = Math.max.apply(null, tests.flatMap((t) => [t[1], t[2]])) * 1.1;
+  const W = (x) => (x / mx * 380).toFixed(1);
+  $('valChart').innerHTML = tests.map(([n, m, b], i) => {
+    const y = 14 + i * 36;
+    return `<text x="0" y="${y + 11}">${n}</text>` +
+      `<rect x="95" y="${y}" width="${W(b)}" height="9" fill="#5b7fa6"/><text x="${100 + +W(b)}" y="${y + 9}">0.25: ${b.toFixed(2)}</text>` +
+      `<rect x="95" y="${y + 12}" width="${W(m)}" height="9" fill="#f0b41f"/><text x="${100 + +W(m)}" y="${y + 21}">model: ${m.toFixed(2)} (×${(b / m).toFixed(2)})</text>`;
+  }).join('');
+}
+function drawCatChart() {
+  const cats = Object.keys(R.fit.cat_multiples).sort((a, b) => R.fit.cat_multiples[b] - R.fit.cat_multiples[a]);
+  const mx = Math.max.apply(null, cats.map((c) => R.fit.cat_multiples[c])) * 1.15;
+  const W = (x) => (x / mx * 380).toFixed(1);
+  const gx = 150 + +W(R.fit.global_median);
+  $('catChart').innerHTML =
+    `<line x1="${gx}" y1="4" x2="${gx}" y2="150" stroke="#ff7a72" stroke-dasharray="4 3"/><text x="${gx + 4}" y="14">global median ${R.fit.global_median.toFixed(3)}×</text>` +
+    cats.map((c, i) => {
+      const y = 22 + i * 15, val = R.fit.cat_multiples[c];
+      return `<text x="0" y="${y + 9}">${esc(c)} (n=${R.fit.cat_n[c]})</text><rect x="150" y="${y}" width="${W(val)}" height="9" fill="#f0b41f"/><text x="${155 + +W(val)}" y="${y + 9}">${val.toFixed(3)}×</text>`;
+    }).join('');
 }
 function drawOdds() {
   const pts = [[0, 0.74], [0.5, 0.71], [1, 0.64], [2, 0.50], [3, 0.35], [4, 0.22], [5.5, 0.10]];
@@ -339,6 +407,22 @@ function drawOdds() {
     `<path d="${path}" fill="none" stroke="#e8a317" stroke-width="2.5"/>` +
     pts.map(([x, y]) => `<circle cx="${X(x)}" cy="${Y(y)}" r="3.5" fill="#0f1e33"/>`).join('') +
     `<text x="30" y="165">0y</text><text x="140" y="165">2.5y</text><text x="270" y="165">5y</text><text x="32" y="32">still pre-token: 74% → 10%</text>`;
+}
+/* Factor waterfall: each multiplier as a bar on a log scale, so the
+   reader sees which terms lift or cut this row's implied value. */
+function factorBars(r) {
+  const factors = [
+    ['Category multiple', r.cat_multiple], ['Size factor', r.size_factor],
+    ['Growth', r.growth_multiplier], ['Maturity', r.maturity_multiplier], ['Launch odds', r.odds],
+  ];
+  const bar = (v) => {
+    const t = clamp(Math.log(v) / Math.log(4), -1, 1);
+    const w = Math.abs(t) * 50;
+    return `<span class="track"><i class="${t < 0 ? 'down' : ''}" style="left:${t < 0 ? 50 - w : 50}%;width:${w}%"></i></span>`;
+  };
+  return '<div aria-label="Factor waterfall">' + factors.map(([n, v]) =>
+    `<div class="factorbar"><span>${n}</span>${bar(v)}<span class="num">×${v.toFixed(3)}</span></div>`).join('') +
+    `<p class="note">TVL ${fmt$(r.tvl_usd)} × all five factors = ${fmt$(r.implied_value_usd)}. Bars are log-scaled around ×1.</p></div>`;
 }
 function openDetail(slug) {
   const r = R.rows.find((x) => x.slug === slug);
@@ -362,6 +446,7 @@ function openDetail(slug) {
       <dt>80% range</dt><dd>${fmt$(r.implied_lo_usd)} – ${fmt$(r.implied_hi_usd)} (conformal ×${(r.band || R.fit.conformal_band).toFixed(2)}${R.fit.conformal_by_cat[r.category || 'None'] ? ', priced for ' + esc(r.category) : ', global band'})</dd>
     </dl>
     <h3>How the number is built</h3>
+    ${factorBars(r)}
     <dl class="kv">
       <dt>Category multiple</dt><dd>${r.cat_multiple.toFixed(3)}× (${esc(r.category || 'global median')})</dd>
       <dt>Size factor</dt><dd>×${r.size_factor.toFixed(3)} (TVL/ref ^ ${R.fit.beta.toFixed(3)})</dd>

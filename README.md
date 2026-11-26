@@ -15,7 +15,7 @@ rule (bridge, liquid-staking, wrapped/staked, exchange-prefixed) and are
 excluded from the board with their reason in the audit — a wrapped
 product of a token that already trades is not a launch.
 
-The model (radar-5) is fitted, not hardcoded: per-category mcap/TVL
+The model (radar-6) is fitted, not hardcoded: per-category mcap/TVL
 multiples and a size curve fitted jointly by median polish on the
 snapshot's 128 live-token comps, with category multiples shrunk toward
 the global median by n/(n+4) and categories under 5 comps priced at the
