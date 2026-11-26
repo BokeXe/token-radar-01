@@ -22,8 +22,8 @@
 </header>
 
 <section class="kpis" id="kpis" aria-label="Key figures"></section>
+<section class="coverage" id="coverageProof" aria-label="Coverage proof"></section>
 <section class="modelstrip" id="modelStrip" aria-label="Fitted model summary"></section>
-<section class="ledger" id="ledger" aria-label="Coverage ledger"></section>
 <section class="integrity" id="integrity" aria-label="Self-check"></section>
 <details class="watchcheck" id="watchCheck">
   <summary>Watchlist coverage — every one of the 40, with its rank</summary>
@@ -120,8 +120,8 @@
       <h3>Farm economics</h3>
       <ul>
         <li>Capital tier by TVL: ≥ $1B $250 · ≥ $100M $150 · ≥ $10M $100 · else $50.</li>
-        <li>Gas per transaction by chain: Ethereum $8 · Bitcoin $3 · Solana $0.05 · other chains $0.50.</li>
-        <li>Hold: &lt; 180 days old 60 d · &lt; 365 d 45 d · older 30 d. Weekly qualifying action + claim.</li>
+        <li>Gas per transaction by chain: Ethereum $8 · Bitcoin $3 · Solana $0.05 · other chains $0.50. Each plan budgets gas for its whole transaction count (3 + one per hold week) and keeps one exit transaction in reserve.</li>
+        <li>Hold: &lt; 180 days old 60 d · &lt; 365 d 45 d · older 30 d, across two weekly snapshots. Eight steps per protocol: wallet + gas budget, official-link setup, weekly logged action, hold, docs/points check, exit reserve, claim safety, verdict.</li>
         <li>Expected farmer value = implied × 0.001% capture (1bp — a 5% airdrop split across ~5,000 farmers; change it in the sandbox). Implied already carries the launch odds, so odds are never applied twice. Verdict: <b>Farm</b> when expected value ≥ 20× gas, <b>Watch</b> ≥ 5×, else <b>Skip</b>.</li>
         <li><span id="planShapes"></span> distinct plan shapes across the board (category × chain × capital × hold × gas × verdict). Pin up to three rows on the board to compare them side by side.</li>
       </ul>

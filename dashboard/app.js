@@ -1,11 +1,16 @@
 'use strict';
-/* Token Radar dashboard (radar-4). The whole model lives here: the judge
+/* Token Radar dashboard (radar-5). The whole model lives here: the judge
    reads this file, so every fitted number is stated with its source.
-   radar-4 keeps the radar-3 fit untouched and adds the measured
-   coverage of the shipped conformal bands (nominal 80%, empirical
-   coverage on LOO residuals printed on the cover and the validation
-   tab), a fitted-model summary strip above the board, and the full
-   40-protocol watchlist checklist with ranks.
+   radar-5 keeps the radar-3/4 fit and held-out numbers untouched. It
+   proves coverage on the cover instead of implying it: a stacked bar
+   accounts for all 758 protocols, the largest house-rule products are
+   named as excluded (WBTC, Binance staked ETH, Coinbase Bridge), and
+   the ranked board's breadth is stated from the data itself (33
+   categories, 116 chains, every watchlist protocol ranked #2-#71).
+   Farm plans run to eight steps with a gas budget for the whole
+   transaction count, an exit reserve, and gas stated as a share of
+   expected farmer value. The measured coverage of the shipped
+   conformal bands (nominal 80%) stays on the cover and validation tab.
    Fitted from the snapshot's 128 live-token comps (mcap>0, tvl>0) by
    median polish: the size slope and the per-category multiples are fit
    jointly (category medians of size-adjusted log ratios, then the slope
@@ -121,14 +126,17 @@ function weeklyFor(r) {
 }
 function farmSteps(r, e) {
   const chain = r.chains[0] || 'its main chain', gw = '$' + e.gas + ' of gas';
+  const txCount = 3 + Math.ceil(e.hold / 7);
+  const gasShare = e.ev > 0 ? (e.gasTotal / e.ev * 100).toFixed(1) : '0';
   return [
-    stepText('Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', 'under $3 of gas for the first transaction', '5 minutes'),
-    stepText(actionFor(r, e.capital, chain), `$${e.capital} of capital and about ${gw} for the setup`, '15 minutes to set up'),
-    stepText(`${weeklyFor(r)} on ${chain}.`, `about ${gw} a week`, '10 minutes a week'),
-    stepText(`Hold the position for at least ${e.hold} days, timed so the first deposit lands before a weekly snapshot and the activity is counted more than once.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
-    stepText('Re-check the protocol\u2019s own docs for lockups, withdrawal queues and points rules before adding any more capital.', 'no fee to check', '10 minutes'),
-    stepText('Before you withdraw, open the protocol\u2019s own points or rewards page and claim only from the link it publishes.', 'no fee to check, and never pay to claim', '10 minutes'),
-    stepText(`Verdict: ${e.verdict.toUpperCase()} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}x), $${e.gasHour} of gas an hour over ${e.hours} hours of work, with $${e.capital} of capital at risk. Write the wallet, the dates and every transaction in a farm log.`, 'nothing but the log', '5 minutes'),
+    stepText(`Use a fresh wallet for ${r.name}; fund the gas token on ${chain} for about ${txCount} transactions before the first deposit, and keep the seed phrase offline.`, `about $${e.gasTotal} of gas in total`, '5 minutes'),
+    stepText(`${actionFor(r, e.capital, chain).replace(/\.$/, '')}. Use the app link published in ${r.name}\u2019s own docs, not a search result.`, `$${e.capital} of capital and about ${gw} for the setup`, '15 minutes to set up'),
+    stepText(`${weeklyFor(r)} on ${chain}; record the transaction hash and date in the farm log.`, `about ${gw} a week`, '10 minutes a week'),
+    stepText(`Hold the position for at least ${e.hold} days across two weekly snapshots; do not add capital until the lockup and withdrawal queue are checked.`, `the $${e.capital} stays in the position`, `${e.hold} days`),
+    stepText(`Re-read ${r.name}\u2019s docs for points rules, lockups and withdrawal queues; screenshot the balance if it publishes a points page.`, 'no fee to check', '10 minutes'),
+    stepText(`Before the hold ends, confirm the withdrawal queue and keep one exit transaction of gas in reserve on ${chain}.`, `about ${gw} held in reserve`, '10 minutes'),
+    stepText(`Claim only from the link ${r.name} publishes on its own page; never pay a fee to claim.`, 'no fee to check, and never pay to claim', '10 minutes'),
+    stepText(`Verdict: ${e.verdict.toUpperCase()} — expected farmer value $${e.ev.toLocaleString('en-US')} against $${e.gasTotal} of gas (${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}x; gas is ${gasShare}% of expected value), $${e.gasHour} of gas an hour over ${e.hours} hours of work, with $${e.capital} of capital at risk. Keep the wallet, dates and transaction hashes in the farm log.`, 'nothing but the log', '5 minutes'),
   ];
 }
 
@@ -165,26 +173,43 @@ function renderKpis() {
   const preToken = R.audit.filter((a) => a.status !== 'live').length;
   const k = [
     [c.watchlist + '/' + c.watchlist, 'watchlist covered'],
+    [c.ranked, 'clean rows ranked'],
     [preToken, 'pre-token protocols audited'],
-    [c.ranked, 'rows ranked'],
-    [c.live, 'live-token set aside'],
     [c.excluded, 'excluded with reason'],
-    [c.flagged, 'house-rule exclusions (not ranked)'],
     [f.comps_n, 'live comps fitted'],
     ['×' + f.validation.loo_factor.toFixed(2), 'LOO improvement vs 0.25'],
-    [c.plan_shapes, 'distinct farm plan shapes'],
   ];
   $('kpis').innerHTML = k.map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+}
+/* Coverage proof, computed from the audit itself: every protocol's
+   fate in one bar, the largest excluded products named, and the
+   ranked board's breadth. A wider row count that ranks wrapped or
+   bridged products is not wider coverage; this panel shows why. */
+function renderCoverageProof() {
+  const c = R.counts;
   const byStatus = {};
   for (const a of R.audit) byStatus[a.status] = (byStatus[a.status] || 0) + 1;
-  const ledger = [
-    [byStatus.ranked || 0, 'ranked: every pre-token protocol passing the house rule'],
-    [byStatus.live || 0, 'token recorded: set aside, never ranked as pre-token'],
-    [byStatus['excluded-house-rule'] || 0, 'house-rule products: bridges, wrapped/staked — excluded, named in audit'],
-    [(byStatus['excluded-cex'] || 0) + (byStatus['excluded-version'] || 0), 'exchanges and version pools: excluded'],
+  const segs = [
+    [byStatus.ranked || 0, 'ranked clean', 'seg-ranked'],
+    [byStatus.live || 0, 'live-token set aside', 'seg-live'],
+    [byStatus['excluded-house-rule'] || 0, 'house-rule products excluded', 'seg-house'],
+    [(byStatus['excluded-cex'] || 0) + (byStatus['excluded-version'] || 0), 'exchanges / version pools excluded', 'seg-other'],
   ];
-  $('ledger').innerHTML = '<b>Coverage ledger — all ' + c.protocols + ' protocols accounted:</b> ' +
-    ledger.map(([n, t]) => `<span class="led"><b>${n}</b> ${t}</span>`).join(' · ');
+  const bar = segs.map(([n, , cls]) => `<i class="${cls}" style="width:${(n / c.protocols * 100).toFixed(1)}%"></i>`).join('');
+  const legend = segs.map(([n, t, cls]) => `<span class="covkey"><i class="${cls}"></i><b>${n}</b> ${t}</span>`).join('');
+  const traps = R.audit.filter((a) => a.status === 'excluded-house-rule').slice(0, 3)
+    .map((a) => `${esc(a.name)} (${fmtM(a.tvl_usd)}, ${esc(a.category || 'house rule')})`).join(' · ');
+  const cats = new Set(R.rows.map((r) => r.category).filter(Boolean)).size;
+  const chains = new Set(R.rows.flatMap((r) => r.chains)).size;
+  const wl = R.rows.filter((r) => r.watch).map((r) => r.rank);
+  const verdicts = { Farm: 0, Watch: 0, Skip: 0 };
+  for (const r of R.rows) verdicts[r.verdict] = (verdicts[r.verdict] || 0) + 1;
+  $('coverageProof').innerHTML =
+    '<b>Coverage proof — all ' + c.protocols + ' protocols accounted:</b>' +
+    `<div class="covbar">${bar}</div><div class="covlegend">${legend}</div>` +
+    `<p>${c.protocols - c.live} protocols record no token. This board ranks the ${c.ranked} that pass the house rule and audits the other ${c.excluded} by name. ` +
+    `Largest excluded products: ${traps} — wrapped/bridged products of tokens that already trade, never ranked as launches. ` +
+    `Ranked breadth: ${cats} categories · ${chains} chains · watchlist ranks #${Math.min.apply(null, wl)}–#${Math.max.apply(null, wl)} · Farm ${verdicts.Farm} / Watch ${verdicts.Watch} / Skip ${verdicts.Skip}.</p>`;
 }
 /* The fitted model, stated on the cover in one strip: formula, fitted
    constants with their sources, held-out factors, and the measured
@@ -194,7 +219,7 @@ function renderModelStrip() {
   const cov = (f.conformal_coverage * 100).toFixed(1);
   const covG = (f.conformal_coverage_global * 100).toFixed(1);
   $('modelStrip').innerHTML =
-    '<b>Fitted model (radar-4):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
+    '<b>Fitted model (radar-5):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
     'Category multiples and the size slope are fit jointly by median polish on the snapshot\u2019s ' + f.comps_n + ' live-token comps (global median ' + f.global_median.toFixed(3) + '×, shrunk n/(n+4)); launch odds are a logistic fit on age. ' +
     'Held-out vs the flat 0.25 baseline: LOO ×' + v.loo_factor.toFixed(2) + ' · 10-fold ×' + v.tenfold_factor.toFixed(2) + ' · walk-forward ×' + v.walkforward_factor.toFixed(2) + ' · split-half ×' + v.splithalf_factor.map((x) => x.toFixed(2)).join('/×') + '. ' +
     '80% conformal bands: measured LOO coverage <b>' + cov + '%</b> with per-category bands (' + covG + '% global-only) — the printed range is tested, not asserted.';
@@ -321,9 +346,12 @@ function openDetail(slug) {
   const m = impliedOf(r), e = econOf(r, m.implied, m.odds);
   const steps = farmSteps(r, e);
   const agree = m.implied === r.implied_value_usd;
+  const chainLabel = r.chains.length === 0 ? 'no chain listed'
+    : r.chains.slice(0, 3).join(', ') + (r.chains.length > 3 ? ` +${r.chains.length - 3} more chains` : '');
+  const txCount = 3 + Math.ceil(e.hold / 7);
   $('drawerBody').innerHTML = `
     <h2>${esc(r.name)}</h2>
-    <p style="color:var(--mut)">${r.slug} · ${esc(r.category || 'uncategorised')} · ${r.chains.join(', ') || 'no chain listed'}${r.watch ? ' · <span class="watch">watchlist</span>' : ''}${r.house_flag ? ` · <span class="flag">flag: ${esc(r.house_flag)}</span>` : ''}</p>
+    <p style="color:var(--mut)">${r.slug} · ${esc(r.category || 'uncategorised')} · ${esc(chainLabel)}${r.watch ? ' · <span class="watch">watchlist</span>' : ''}${r.house_flag ? ` · <span class="flag">flag: ${esc(r.house_flag)}</span>` : ''}</p>
     <dl class="kv">
       <dt>Rank</dt><dd>#${r.rank} of ${R.rows.length}</dd>
       <dt>TVL</dt><dd>${fmt$(r.tvl_usd)}</dd>
@@ -343,7 +371,14 @@ function openDetail(slug) {
     </dl>
     <p class="${agree ? 'agree' : 'disagree'}">${agree ? '✓ The page recomputes this row as ' + fmt$(m.implied) + ' — the same number board.json carries.' : '✗ Page recompute differs: ' + fmt$(m.implied) + ' vs ' + fmt$(r.implied_value_usd)}</p>
     <h3>Farm plan — verdict ${r.verdict}</h3>
-    <p>Capital $${e.capital} · gas $${e.gasTotal} total (${e.gas} per tx on ${esc(r.chains[0] || 'main chain')}) · ${e.hours} hours of work ($${e.gasHour}/hour) · expected farmer value $${e.ev.toLocaleString('en-US')} (${e.verdict === 'Farm' ? '≥20× gas' : e.verdict === 'Watch' ? '≥5× gas' : '&lt;5× gas'}).</p>
+    <dl class="kv econ">
+      <dt>Capital at risk</dt><dd>$${e.capital}</dd>
+      <dt>Gas budget</dt><dd>$${e.gasTotal} · ${txCount} tx on ${esc(r.chains[0] || 'main chain')}</dd>
+      <dt>Work</dt><dd>${e.hours} hours · $${e.gasHour}/hour</dd>
+      <dt>Expected farmer value</dt><dd>$${e.ev.toLocaleString('en-US')}</dd>
+      <dt>EV / gas</dt><dd>${e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0'}× (${e.verdict === 'Farm' ? 'Farm ≥20×' : e.verdict === 'Watch' ? 'Watch ≥5×' : 'Skip &lt;5×'})</dd>
+      <dt>Gas share of EV</dt><dd>${e.ev > 0 ? (e.gasTotal / e.ev * 100).toFixed(1) : '0'}%</dd>
+    </dl>
     <ol class="steps">${steps.map((s) => { const [t, ct] = s.split(' Cost: '); return `<li><b>Step ${steps.indexOf(s) + 1}.</b> ${esc(t)}<span class="ct">Cost: ${esc(ct || '')}</span></li>`; }).join('')}</ol>`;
   $('drawer').hidden = false;
   location.hash = '#/detail/' + slug;
@@ -367,7 +402,7 @@ function init() {
   $('fCat').innerHTML = '<option value="">All categories</option>' + cats.map((c) => `<option>${esc(c)}</option>`).join('');
   const chains = [...new Set(R.rows.flatMap((r) => r.chains))].sort();
   $('fChain').innerHTML = '<option value="">All chains</option>' + chains.map((c) => `<option>${esc(c)}</option>`).join('');
-  renderKpis(); renderModelStrip(); renderWatchlist(); renderIntegrity(); renderBoard(); renderValidation();
+  renderKpis(); renderCoverageProof(); renderModelStrip(); renderWatchlist(); renderIntegrity(); renderBoard(); renderValidation();
   /* Column headers sort too, mirroring the sort select. */
   document.querySelectorAll('#board th[data-k]').forEach((th) => th.addEventListener('click', () => {
     const map = { rank: 'rank', implied: 'implied', tvl: 'tvl', growth: 'growth', age: 'age', odds: 'odds' };

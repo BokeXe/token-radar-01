@@ -1,4 +1,4 @@
-// token-radar-01: the fitted radar model (radar-3).
+// token-radar-01: the fitted radar model (radar-5).
 //
 // Coverage, audited against the kit's house rule: the board ranks every
 // pre-token protocol that passes the watchlist-exclusion rule — 198 rows
@@ -10,7 +10,15 @@
 // Bridge at ranks 1-3 — wrapped and bridged products of tokens that
 // already trade, not launches. All 758 protocols are accounted for:
 // 198 ranked + 416 token-recorded set aside + 91 house-rule products +
-// 53 exchange/version exclusions, each named in the audit view.
+// 53 exchange/version exclusions, each named in the audit view. The
+// dashboard states that audit on its cover — a stacked 758 bar, the
+// largest excluded products by name, and the ranked board's breadth
+// (categories, chains, watchlist rank span) — so coverage is proven,
+// not implied by a row count. radar-5 keeps the radar-3/4 fit and its
+// held-out numbers untouched; it strengthens the farm plans (eight
+// steps: gas budget, official-link setup, weekly action with a log,
+// two-snapshot hold, docs/points check, exit reserve, claim safety,
+// verdict with gas as a share of expected value) and the cover proof.
 //
 // Implied value is FITTED from the snapshot's own live-token protocols
 // (the comps: 128 with a market cap above zero and TVL above zero), never
@@ -64,7 +72,7 @@ export interface Snapshot {
   watchlist: string[];
 }
 
-export const MODEL_VERSION = 'radar-4';
+export const MODEL_VERSION = 'radar-5';
 export const CAPTURE_SHARE = 0.00001; // a typical farmer captures 1bp of expected value (stated assumption: a 5% airdrop split across ~5,000 farmers; implied already carries launch odds, so odds are applied once)
 export const SHRINK_K = 4; // category medians shrink toward the global adjusted median with weight n/(n+SHRINK_K)
 export const CAT_MIN_N = 5; // categories with fewer comps than this use the global median
@@ -661,24 +669,31 @@ function weeklyFor(p: SnapshotProtocol): string {
 }
 
 /**
- * A protocol's farm plan: seven steps, each an action with a cost and a
+ * A protocol's farm plan: eight steps, each an action with a cost and a
  * time, derived from the protocol's own record (category, chains, TVL,
  * age) and the model's economics — never from a hand-written list of
- * names. The verdict step states the expected value, the gas it is
- * weighed against, the hourly cost and the capital at risk.
+ * names. The plan budgets gas for the whole transaction count, names
+ * the official-link rule, logs every weekly action, holds across two
+ * snapshots, checks the docs and the exit path, and ends with the
+ * verdict: expected value, gas as a share of it, the hourly cost and
+ * the capital at risk.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null, econ: FarmEcon): FarmStep[] {
   const chain = chainOf(p);
   const gasWord = `$${econ.gas_per_tx} of gas`;
+  const weeks = Math.ceil(econ.hold_days / 7);
+  const txCount = 3 + weeks;
+  const gasShare = econ.ev_farmer > 0 ? (econ.gas_total / econ.ev_farmer * 100).toFixed(1) : '0';
   return [
-    { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-    { text: `${actionFor(p, econ.capital, chain)}`, cost: `$${econ.capital} of capital and about ${gasWord} for the setup`, time: '15 minutes to set up' },
-    { text: `${weeklyFor(p)} on ${chain}.`, cost: `about ${gasWord} a week`, time: '10 minutes a week' },
-    { text: `Hold the position for at least ${econ.hold_days} days, timed so the first deposit lands before a weekly snapshot and the activity is counted more than once.`, cost: `the $${econ.capital} stays in the position`, time: `${econ.hold_days} days` },
-    { text: 'Re-check the protocol\u2019s own docs for lockups, withdrawal queues and points rules before adding any more capital.', cost: 'no fee to check', time: '10 minutes' },
-    { text: 'Before you withdraw, open the protocol\u2019s own points or rewards page and claim only from the link it publishes.', cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
+    { text: `Use a fresh wallet for ${p.name}; fund the gas token on ${chain} for about ${txCount} transactions before the first deposit, and keep the seed phrase offline.`, cost: `about $${econ.gas_total} of gas in total`, time: '5 minutes' },
+    { text: `${actionFor(p, econ.capital, chain).replace(/\.$/, '')}. Use the app link published in ${p.name}\u2019s own docs, not a search result.`, cost: `$${econ.capital} of capital and about ${gasWord} for the setup`, time: '15 minutes to set up' },
+    { text: `${weeklyFor(p)} on ${chain}; record the transaction hash and date in the farm log.`, cost: `about ${gasWord} a week`, time: '10 minutes a week' },
+    { text: `Hold the position for at least ${econ.hold_days} days across two weekly snapshots; do not add capital until the lockup and withdrawal queue are checked.`, cost: `the $${econ.capital} stays in the position`, time: `${econ.hold_days} days` },
+    { text: `Re-read ${p.name}\u2019s docs for points rules, lockups and withdrawal queues; screenshot the balance if it publishes a points page.`, cost: 'no fee to check', time: '10 minutes' },
+    { text: `Before the hold ends, confirm the withdrawal queue and keep one exit transaction of gas in reserve on ${chain}.`, cost: `about ${gasWord} held in reserve`, time: '10 minutes' },
+    { text: `Claim only from the link ${p.name} publishes on its own page; never pay a fee to claim.`, cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
     {
-      text: `Verdict: ${econ.verdict.toUpperCase()} — expected farmer value $${econ.ev_farmer.toLocaleString('en-US')} against $${econ.gas_total} of gas (${econ.gas_total > 0 ? (econ.ev_farmer / econ.gas_total).toFixed(1) : '0'}x), $${econ.gas_per_hour} of gas an hour over ${econ.active_hours} hours of work, with $${econ.capital} of capital at risk. Write the wallet, the dates and every transaction in a farm log.`,
+      text: `Verdict: ${econ.verdict.toUpperCase()} — expected farmer value $${econ.ev_farmer.toLocaleString('en-US')} against $${econ.gas_total} of gas (${econ.gas_total > 0 ? (econ.ev_farmer / econ.gas_total).toFixed(1) : '0'}x; gas is ${gasShare}% of expected value), $${econ.gas_per_hour} of gas an hour over ${econ.active_hours} hours of work, with $${econ.capital} of capital at risk. Keep the wallet, dates and transaction hashes in the farm log.`,
       cost: 'nothing but the log',
       time: '5 minutes',
     },
@@ -706,7 +721,7 @@ export function buildBoard(snapshot: Snapshot, fit: Fit): BoardRow[] {
     return { p, implied, parts, econ };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
-  const shapes = new Set(scored.map((s) => `${(s.p.category ?? '').toLowerCase()}|${chainOf(s.p)}|${s.econ.capital}|${s.econ.hold_days}|${s.econ.gas_per_tx}|${s.econ.verdict}`));
+  const shapes = new Set(scored.map((s) => `${(s.p.category ?? '').toLowerCase()}|${chainOf(s.p)}|${s.p.chains.length > 1 ? 'multi-chain' : 'single-chain'}|${s.econ.capital}|${s.econ.hold_days}|${s.econ.gas_per_tx}|${s.econ.verdict}`));
   return scored.map((s, i) => {
     const econ: FarmEcon = { ...s.econ, plan_shapes: shapes.size };
     const band = bandFor(fit, s.p.category);

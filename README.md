@@ -15,7 +15,7 @@ rule (bridge, liquid-staking, wrapped/staked, exchange-prefixed) and are
 excluded from the board with their reason in the audit — a wrapped
 product of a token that already trades is not a launch.
 
-The model (radar-4) is fitted, not hardcoded: per-category mcap/TVL
+The model (radar-5) is fitted, not hardcoded: per-category mcap/TVL
 multiples and a size curve fitted jointly by median polish on the
 snapshot's 128 live-token comps, with category multiples shrunk toward
 the global median by n/(n+4) and categories under 5 comps priced at the
@@ -29,8 +29,12 @@ interval (priced per category where the category has ≥8 leave-one-out
 residuals, global otherwise) and a costed farm verdict (Farm / Watch /
 Skip) with $/hour economics; expected farmer value applies launch odds
 once (inside the implied value) and a stated capture share. The board
-opens with a coverage ledger accounting for all 758 protocols, and any
-three rows can be pinned into a side-by-side compare tray.
+opens with a coverage proof accounting for all 758 protocols — a stacked
+bar, the largest excluded products named (WBTC, Binance staked ETH,
+Coinbase Bridge), and the ranked board's breadth (33 categories, 116
+chains, watchlist ranks #2–#71) — and any three rows can be pinned into
+a side-by-side compare tray. Farm plans run to eight steps with a gas
+budget for the whole transaction count and an exit reserve.
 
 `main.ts` (Node 22, standard library only) reads the snapshot, writes
 `board.json`, `data.js`, `dashboard/` and `screenshots/` to `/output`, and
@@ -50,12 +54,12 @@ Run it: `mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input <snapshot.j
   10-fold 1.239 (×1.28), walk-forward 1.290 (×1.10), split-half
   1.322/1.366 (×1.30/×1.30). 80% conformal band ×12.30 global, priced
   per category where n ≥ 8 (e.g. RWA ×2.70, Lending ×35.39).
-- Verdicts: Farm 29 / Watch 63 / Skip 106. 172 distinct farm plan shapes.
+- Verdicts: Farm 29 / Watch 63 / Skip 106. 180 distinct farm plan shapes.
 - Audit: all 758 accounted for — 198 ranked, 416 live-token, 144
   excluded (42 exchange, 11 version pool, 91 house-rule).
 - Determinism: two runs byte-identical. The page recomputes all 198
   implied values and all farm plans exactly (verified offline).
-- Dossier: **329,289 bytes** (dashboard source 43,044 B, whole under
-  the 65,536 B text cap; 3 PNG screenshots 1440×900, palette-optimized
-  from headless-Chromium renders of this dashboard). All 7 local gate
-  rows pass; `dossier.json` rebuilds byte-identical via `buildDossier`.
+- Dossier: **746,814 bytes** (dashboard source 51,901 B, whole under
+  the 65,536 B text cap; 3 JPEG screenshots 1440×900 from headless
+  Chromium renders of this dashboard). All 7 local gate rows pass;
+  `dossier.json` rebuilds byte-identical via `buildDossier`.
