@@ -240,12 +240,15 @@ function renderCoverageProof() {
   const wl = R.rows.filter((r) => r.watch).map((r) => r.rank);
   const verdicts = { Farm: 0, Watch: 0, Skip: 0 };
   for (const r of R.rows) verdicts[r.verdict] = (verdicts[r.verdict] || 0) + 1;
+  const farmTop = R.rows.filter((r) => r.verdict === 'Farm')
+    .sort((a, b) => (b.ev_farmer / b.gas_total) - (a.ev_farmer / a.gas_total)).slice(0, 3)
+    .map((r) => `#${r.rank} ${esc(r.name)} ${(r.ev_farmer / r.gas_total).toFixed(1)}× EV/gas`).join(' · ');
   $('coverageProof').innerHTML =
     '<b>Coverage proof — all ' + c.protocols + ' protocols accounted:</b>' +
     `<div class="covbar">${bar}</div><div class="covlegend">${legend}</div>` +
     `<p>${c.protocols - c.live} protocols record no token. This board ranks the ${c.ranked} that pass the house rule and audits the other ${c.excluded} by name. ` +
     `Largest excluded products: ${traps} — wrapped/bridged products of tokens that already trade, never ranked as launches. ` +
-    `Ranked breadth: ${cats} categories · ${chains} chains · watchlist ranks #${Math.min.apply(null, wl)}–#${Math.max.apply(null, wl)} · Farm ${verdicts.Farm} / Watch ${verdicts.Watch} / Skip ${verdicts.Skip}.</p>`;
+    `Ranked breadth: ${cats} categories · ${chains} chains · watchlist ranks #${Math.min.apply(null, wl)}–#${Math.max.apply(null, wl)} · Farm ${verdicts.Farm} / Watch ${verdicts.Watch} / Skip ${verdicts.Skip}. Strongest farm math: ${farmTop}.</p>`;
 }
 /* The fitted model, stated on the cover in one strip: formula, fitted
    constants with their sources, held-out factors, and the measured
@@ -305,7 +308,7 @@ function renderBoard() {
   $('rows').innerHTML = rows.map((r) => {
     const w = Math.max(2, Math.round(r.implied_value_usd / mx * 100));
     const pin = pinned.has(r.slug) ? 'pinned' : 'pin';
-    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b> <span class="slug">${r.slug}</span>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''} <button class="pinbtn" data-pin="${r.slug}" aria-label="Pin ${esc(r.name)} for comparison">${pin}</button></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><span class="bar"><i style="width:${w}%"></i></span><b>${fmtM(r.implied_value_usd)}</b> <span class="rng">80% ${fmtM(r.implied_lo_usd)}–${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span></td></tr>`;
+    return `<tr data-slug="${r.slug}"><td class="num">${r.rank}</td><td><b>${esc(r.name)}</b> <span class="slug">${r.slug}</span>${r.watch ? '<span class="watch">watchlist</span>' : ''}${r.house_flag ? `<span class="flag" title="Matches the house watchlist-exclusion rule: ${esc(r.house_flag)}">flag: ${esc(r.house_flag)}</span>` : ''} <button class="pinbtn" data-pin="${r.slug}" aria-label="Pin ${esc(r.name)} for comparison">${pin}</button></td><td>${esc(r.category || '—')}</td><td class="num">${fmtM(r.tvl_usd)}</td><td class="num">${r.change_7d === null ? '—' : fmtPct(r.change_7d)}</td><td class="num">${r.age_days === null ? '—' : r.age_days + 'd'}</td><td class="num">${(r.odds * 100).toFixed(0)}%</td><td><span class="bar"><i style="width:${w}%"></i></span><b>${fmtM(r.implied_value_usd)}</b> <span class="rng">80% ${fmtM(r.implied_lo_usd)}–${fmtM(r.implied_hi_usd)}</span></td><td><span class="pill ${r.verdict}">${r.verdict}</span> <span class="evgas">${(r.ev_farmer / r.gas_total).toFixed(1)}× EV/gas</span></td></tr>`;
   }).join('');
   document.querySelectorAll('#rows tr').forEach((tr) => tr.addEventListener('click', () => openDetail(tr.dataset.slug)));
   document.querySelectorAll('[data-pin]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); togglePin(b.dataset.pin); }));
@@ -426,6 +429,21 @@ function factorBars(r) {
     `<div class="factorbar"><span>${n}</span>${bar(v)}<span class="num">×${v.toFixed(3)}</span></div>`).join('') +
     `<p class="note">TVL ${fmt$(r.tvl_usd)} × all five factors = ${fmt$(r.implied_value_usd)}. Bars are log-scaled around ×1.</p></div>`;
 }
+/* One-glance decision card: verdict maths, rank drivers and first move,
+   all recomputed from this row's own factors and economics. */
+function decisionCard(r, e) {
+  const factors = [
+    ['category multiple', r.cat_multiple], ['size factor', r.size_factor],
+    ['growth', r.growth_multiplier], ['maturity', r.maturity_multiplier], ['launch odds', r.odds],
+  ].sort((a, b) => Math.abs(Math.log(b[1])) - Math.abs(Math.log(a[1])));
+  const drivers = factors.slice(0, 2).map(([n, v]) => `${n} ×${v.toFixed(3)}`).join(' · ');
+  const evGas = e.gasTotal > 0 ? (e.ev / e.gasTotal).toFixed(1) : '0';
+  const firstMove = e.verdict === 'Skip'
+    ? 'monitor only until EV/gas reaches 5× or a points programme appears'
+    : actionFor(r, e.capital, r.chains[0] || 'its main chain').replace(/\.$/, '').toLowerCase();
+  return `<div class="decision"><b>Decision: ${e.verdict}</b> — ${evGas}× EV/gas · $${e.capital} capital · $${e.gasTotal} gas · ${e.hold}d hold · ${e.hours}h work.<br>` +
+    `<span>Rank drivers: ${drivers}. First move: ${esc(firstMove)}.</span></div>`;
+}
 function openDetail(slug) {
   const r = R.rows.find((x) => x.slug === slug);
   if (!r) return;
@@ -457,6 +475,7 @@ function openDetail(slug) {
       <dt>Launch odds</dt><dd>×${r.odds.toFixed(3)}</dd>
     </dl>
     <p class="${agree ? 'agree' : 'disagree'}">${agree ? '✓ The page recomputes this row as ' + fmt$(m.implied) + ' — the same number board.json carries.' : '✗ Page recompute differs: ' + fmt$(m.implied) + ' vs ' + fmt$(r.implied_value_usd)}</p>
+    ${decisionCard(r, e)}
     <h3>Farm plan — verdict ${r.verdict}</h3>
     <dl class="kv econ">
       <dt>Capital at risk</dt><dd>$${e.capital}</dd>
