@@ -258,6 +258,7 @@ function renderModelStrip() {
     '<b>Fitted model (radar-6):</b> implied = TVL × category multiple × (TVL/$32.6M)<sup>−0.525</sup> × growth × maturity × launch odds. ' +
     'Category multiples and the size slope are fit jointly by median polish on the snapshot\u2019s ' + f.comps_n + ' live-token comps (global median ' + f.global_median.toFixed(3) + '×, shrunk n/(n+4)); launch odds are a logistic fit on age. ' +
     'Held-out vs the flat 0.25 baseline: LOO ×' + v.loo_factor.toFixed(2) + ' · 10-fold ×' + v.tenfold_factor.toFixed(2) + ' · walk-forward ×' + v.walkforward_factor.toFixed(2) + ' · split-half ×' + v.splithalf_factor.map((x) => x.toFixed(2)).join('/×') + '. ' +
+    'Median |log error| (LOO): model ' + v.loo.toFixed(3) + ' vs flat-0.25 baseline ' + v.loo_base.toFixed(3) + ' — every factor above is fit from snapshot figures, none hardcoded. ' +
     '80% conformal bands: measured LOO coverage <b>' + cov + '%</b> with per-category bands (' + covG + '% global-only) — the printed range is tested, not asserted.';
   $('coverageNote').textContent = 'Measured coverage on the LOO residuals: the shipped per-category bands cover ' + cov + '% of held-out comps (global band alone ' + covG + '%), against the 80% nominal level.';
 }
@@ -279,6 +280,7 @@ function renderIntegrity() {
   }
   const checks = [
     ['Watchlist covered', wl + '/' + R.counts.watchlist, wl === R.counts.watchlist],
+    ['No ranked row already trades a token', R.rows.filter((r) => r.mcap_usd == null).length + '/' + R.rows.length + ' pre-token', R.rows.every((r) => r.mcap_usd == null)],
     ['Ranks 1..' + R.rows.length + ' once each', 'ok', R.rows.map((r) => r.rank).sort((a, b) => a - b).every((v, i) => v === i + 1)],
     ['Implied values non-increasing with rank', 'ok', R.rows.every((r, i) => i === 0 || r.implied_value_usd <= R.rows[i - 1].implied_value_usd)],
     ['Page recomputes implied values', agree + '/' + R.rows.length + ' exact', agree === R.rows.length],
