@@ -6,10 +6,10 @@ h2{font:700 21px/1.25 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif
 .brand{display:flex;gap:12px;align-items:center}.mark{font-size:28px;color:var(--amber);text-shadow:0 0 18px rgba(240,180,31,.45)}
 .sub{margin:2px 0 0;color:var(--mut);font-size:13px}.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .meta span{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;color:#cfe0f5}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:7px;padding:8px 26px 0}
-.kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-top:3px solid var(--amber);border-radius:10px;padding:6px 11px}
-.kpi b{display:block;font:800 19px/1.1 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#fff}.kpi span{font-size:11.5px;color:var(--mut)}
-.coverage{margin:7px 26px 0;background:#101c2e;border:1px solid #2c4a73;border-radius:10px;padding:7px 13px;font-size:12.5px;line-height:1.42}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;padding:6px 26px 0}
+.kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-top:3px solid var(--amber);border-radius:10px;padding:4px 10px;line-height:1.3}
+.kpi b{display:block;font:800 17px/1.1 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#fff}.kpi span{font-size:11px;color:var(--mut)}
+.coverage{margin:5px 26px 0;background:#101c2e;border:1px solid #2c4a73;border-radius:10px;padding:5px 12px;font-size:12px;line-height:1.35}
 .coverage b{color:#fff}.coverage p{margin:6px 0 0;color:#cfe0f5}
 .covbar{display:flex;height:11px;border-radius:6px;overflow:hidden;margin:7px 0 5px;border:1px solid var(--line)}
 .covbar i{display:block;height:100%}
@@ -17,11 +17,9 @@ h2{font:700 21px/1.25 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif
 .covlegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--mut)}
 .covkey i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .covkey b{color:#fff;font-family:var(--mono)}
-.modelstrip{margin:7px 26px 0;background:linear-gradient(180deg,#1a2a45,#131f35);border:1px solid #35507c;border-left:4px solid var(--amber);border-radius:10px;padding:7px 13px;font-size:12.5px;line-height:1.42}
-.modelstrip b{color:var(--amber2)}
-.integrity{margin:7px 26px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-size:12.5px;line-height:1.42}
+.integrity{margin:5px 26px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 12px;font-size:12px;line-height:1.35}
 .integrity b{color:var(--green)}.integrity .bad{color:var(--red);font-weight:700}
-.watchcheck{margin:7px 26px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 13px;font-size:12.5px}
+.watchcheck{margin:5px 26px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 12px;font-size:12px}
 .watchcheck summary{cursor:pointer;font-weight:700;color:var(--amber2)}
 .watchgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2px 18px;margin:8px 0;padding-left:20px}
 .watchgrid li{font-size:13px}.watchgrid span{color:var(--mut);font-variant-numeric:tabular-nums}
@@ -40,7 +38,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .chk{font-size:13px;display:flex;gap:5px;align-items:center}
 .count{font-size:12.5px;color:var(--mut);margin:3px 0}
 .tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-table{width:100%;border-collapse:collapse;font-size:12.3px}th,td{padding:3px 8px;text-align:left;border-bottom:1px solid #1b2942;white-space:nowrap;line-height:1.3}
+table{width:100%;border-collapse:collapse;font-size:12.3px}th,td{padding:2px 7px;text-align:left;border-bottom:1px solid #1b2942;white-space:nowrap;line-height:1.25}
 .evgas{color:var(--mut);font-size:11px;font-variant-numeric:tabular-nums}.decision{background:linear-gradient(180deg,#1a2a45,#121e33);border:1px solid #35507c;border-left:4px solid var(--amber);border-radius:9px;padding:10px 12px;margin:10px 0;font-size:13.5px;line-height:1.45}.decision b{color:var(--amber2)}.decision span{color:#cfe0f5}
 th{background:#0e1830;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);cursor:pointer;position:sticky;top:0}
 th:hover{color:var(--amber2)}
@@ -77,4 +75,15 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#1a2a45}
 svg text{font:11px sans-serif;fill:var(--mut)}
 .drawer table.cmp{font-size:13px}
 .drawer table.cmp th:first-child{color:var(--mut);text-transform:none;letter-spacing:0}
-@media(max-width:700px){.top{padding:16px}.kpis,.tabs,.view{padding-left:14px;padding-right:14px}.integrity,.coverage,.comparebar,.modelstrip,.watchcheck{margin-left:14px;margin-right:14px}}
+.kpilab{display:block;font-size:11px;color:var(--mut);text-transform:none}.kpi small{font-size:12px;color:var(--mut);font-weight:600}
+.formula-line{margin:6px 26px 0;font-size:12.5px;color:#cfe0f5}.formula-line b{color:var(--amber2)}
+.covhead{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}.covhead span{color:var(--mut);font-size:12px}
+.seg-ranked2{background:#2e9e6b}.seg-live2{background:#3d5a7d}
+.evidence{margin:5px 26px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 12px;font-size:12px}
+.evgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 16px;margin-top:4px}
+.evgrid h4{margin:1px 0 3px;font-size:11.5px;color:#fff}
+.evtab{font-size:11px}.evtab th{position:static;padding:1px 5px}.evtab td{padding:1px 5px;white-space:normal;line-height:1.25}
+.kept{color:var(--green);font-weight:700}.evnote{color:var(--mut);font-size:11.5px;margin:4px 0 0;line-height:1.35}
+.oddsbar{display:inline-block;vertical-align:middle;height:6px;background:#223453;border-radius:3px;width:44px;position:relative;margin-right:6px}
+.oddsbar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#5b7fa6,#9fc2f5);border-radius:3px}
+@media(max-width:700px){.top{padding:16px}.kpis,.tabs,.view{padding-left:14px;padding-right:14px}.integrity,.coverage,.comparebar,.modelstrip,.watchcheck,.evidence{margin-left:14px;margin-right:14px}.formula-line{margin-left:14px;margin-right:14px}}

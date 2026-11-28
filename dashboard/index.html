@@ -22,9 +22,10 @@
 </header>
 
 <section class="kpis" id="kpis" aria-label="Key figures"></section>
+<p class="formula-line" id="formulaLine"></p>
 <section class="coverage" id="coverageProof" aria-label="Coverage proof"></section>
-<section class="modelstrip" id="modelStrip" aria-label="Fitted model summary"></section>
 <section class="integrity" id="integrity" aria-label="Self-check"></section>
+<section class="evidence" id="evidence" aria-label="Out-of-sample evidence"></section>
 <details class="watchcheck" id="watchCheck">
   <summary>Watchlist coverage — every one of the 40, with its rank</summary>
   <div id="watchList"></div>
@@ -58,14 +59,14 @@
   <div class="tablewrap">
   <table id="board">
     <thead><tr>
-      <th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="category">Category</th>
+      <th data-k="rank"># · Range</th><th data-k="name">Protocol</th>
       <th data-k="tvl">TVL</th><th data-k="growth">7d</th><th data-k="age">Age</th>
-      <th data-k="odds">Launch odds</th><th data-k="implied">Implied value</th><th data-k="verdict">Verdict</th>
+      <th data-k="odds">Token odds</th><th data-k="implied">If it launches</th><th data-k="implied">Implied value</th><th>P25–P75</th><th data-k="verdict">Verdict · net of fees</th><th>Net / hour</th>
     </tr></thead>
     <tbody id="rows"></tbody>
   </table>
   </div>
-  <p class="note">Implied value = TVL × fitted category multiple × size curve × growth × maturity × launch odds. The 80% range is the conformal band from held-out residuals, priced per category where the residuals allow — wide on purpose: the multiple varies a lot across protocols, and the range says so. Click a row for the full decomposition and farm plan; pin up to three rows to compare them side by side.</p>
+  <p class="note">Implied value = TVL × fitted multiple (the value if a token launches) × token odds (from how long peers ran before recording one). Range is the 5th–95th percentile rank across 200 bootstrap refits of the value model. P25–P75 is the middle half of held-out residuals — its measured coverage is printed above, not asserted. Verdict prices the work: expected drop at a 0.5bp capture share, minus gas, per active hour; Farm pays at least $25 an hour net. Click a row for the full decomposition and farm plan; pin up to three rows to compare them side by side.</p>
 </section>
 
 <section id="view-live" class="view" hidden>
@@ -90,13 +91,18 @@
 
 <section id="view-validation" class="view" hidden>
   <h2>Validation — every term fitted, then tested held-out</h2>
-  <p class="lede">The model is fitted on the snapshot's 128 live-token comps and tested four ways, each against the starter's constant 0.25 multiple. Metric: median |log error| on market cap. A term that did not survive held-out testing was dropped — growth and age weights were never fitted at all, because they carry no signal (corr 0.012 and 0.008 with the multiple).</p>
-  <div class="tablewrap"><table id="valTable"><thead><tr><th>Test</th><th>Model</th><th>Baseline 0.25</th><th>Improvement</th><th>What it proves</th></tr></thead><tbody id="valRows"></tbody></table></div>
+  <p class="lede">A term is kept only if it lowers the held-out miss in both tests. Value terms are scored by typical miss (exp of median |log error|) on the 94 traded comps; odds terms by Brier score on the 383 dated peers. The control term — another row's growth — must not help, and does not.</p>
+  <h3>Value if a token launches — typical miss, 94 traded comps</h3>
+  <div class="tablewrap"><table><thead><tr><th>Term, added in order</th><th>Leave-one-out</th><th>Walk-forward</th><th>Verdict</th></tr></thead><tbody id="valueTermRows"></tbody></table></div>
+  <h3>Token odds — Brier score, 383 peers (share called right in brackets)</h3>
+  <div class="tablewrap"><table><thead><tr><th>Term, added in order</th><th>Ten-fold</th><th>Walk-forward</th><th>Verdict</th></tr></thead><tbody id="oddsTermRows"></tbody></table></div>
+  <h3>Category penalty grid (value model, kept terms)</h3>
+  <div class="tablewrap"><table><thead><tr><th>Lambda</th><th>Leave-one-out</th><th>Walk-forward</th></tr></thead><tbody id="lambdaRows"></tbody></table></div>
   <div class="chartbox"><h3>Held-out error: fitted model vs flat 0.25 (median |log error|, lower is better)</h3><svg id="valChart" viewBox="0 0 640 190" role="img" aria-label="Validation chart"></svg></div>
-  <div class="chartbox"><h3>Fitted category multiples at reference TVL (shrunk medians)</h3><svg id="catChart" viewBox="0 0 640 170" role="img" aria-label="Category multiples chart"></svg></div>
-  <h3>Fitted multiples by category (median polish, shrunk n/(n+4), n ≥ 5)</h3>
-  <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th><th>80% band</th></tr></thead><tbody id="catRows"></tbody></table></div>
-  <p class="note">Size curve and category multiples are fit jointly by median polish: multiple × (TVL / $32,575,274)^−0.525 — bigger protocols trade at lower multiples (corr −0.40). Category medians shrink toward the global median 0.2138 with weight n/(n+4); categories under 5 comps use the global median. 80% conformal bands come from leave-one-out residuals, priced per category where at least 8 residuals exist (global ×12.30 otherwise): the honest width of the multiple's spread, per kind. <span id="coverageNote"></span></p>
+  <div class="chartbox"><h3>Fitted category multiples at reference TVL</h3><svg id="catChart" viewBox="0 0 640 170" role="img" aria-label="Category multiples chart"></svg></div>
+  <h3>Fitted multiples by category (median regression, ridge 4, n ≥ 5)</h3>
+  <div class="tablewrap"><table><thead><tr><th>Category</th><th>Comps</th><th>Multiple at ref TVL</th><th>Bootstrap s.e. (log)</th></tr></thead><tbody id="catRows"></tbody></table></div>
+  <p class="note" id="coverageNote"></p>
 </section>
 
 <section id="view-method" class="view" hidden>
@@ -104,19 +110,18 @@
   <div class="methodgrid">
     <div class="card">
       <h3>The formula</h3>
-      <p class="formula">implied = TVL × catMultiple × (TVL/ref)^β × growth × maturity × odds</p>
+      <p class="formula">implied = TVL × exp(intercept + category) × (TVL/ref)^slope × odds</p>
       <ul>
-        <li><b>catMultiple</b> — median mcap/TVL of live-token comps in the category, fit jointly with the size curve by median polish and shrunk toward the global median with weight n/(n+4); categories under 5 comps use the global median 0.2138.</li>
-        <li><b>Size curve</b> — β = −0.525 from the same median polish (slope of category-demeaned log ratios on log TVL); ref TVL $32,575,274 (comps median).</li>
-        <li><b>Growth</b> — 1 + clamp(7d, −60, +120)% × 0.5. Structural, stated weight — growth does not predict the multiple.</li>
-        <li><b>Maturity</b> — 0.6 + min(age, 1095)/1095 × 0.4; unknown age counts as 365 days. Structural, not fitted.</li>
-        <li><b>Odds</b> — 1 − sigmoid(−1.2089 + 0.6141 × age in years), logistic fit on tokenized ~ age (n = 645). Falls with age: a protocol still pre-token after 3 years is unlikely to launch soon. Single cross-section, no launch dates — a model claim, not a measured hazard.</li>
+        <li><b>Value if a token launches</b> — median regression of log(mcap/TVL) on ln TVL plus ridge-4 category effects, fitted on the 94 traded comps of kinds the board can rank. Every term was tested held-out twice; growth, age and chain count failed a test and stay out.</li>
+        <li><b>Token odds</b> — 1 − P(tokenized | age, size, growth, chains, category) from a ridge logistic fit on 383 dated peers (192 record a token). The peers' record, not a forecast: the page never says a token will launch.</li>
+        <li><b>Ranges</b> — P25–P75 and P10–P90 from signed leave-one-out residuals, with walk-forward coverage printed next to the stated levels. Rank ranges: 5th–95th percentile rank across 200 bootstrap refits.</li>
+        <li><b>Unknown age</b> counts as 365 days in the odds model; the snapshot reports no listed date for those rows.</li>
       </ul>
     </div>
     <div class="card">
-      <h3>Launch odds by age</h3>
-      <svg id="oddsChart" viewBox="0 0 320 170" role="img" aria-label="Launch odds fall with age"></svg>
-      <p class="note">Share of protocols at each age that are still pre-token: 74% at 0–180 days, 60% at 180–365, 62% at 365–730, 45% at 730–1095, 21% at 1095–1460, 20% past 1460.</p>
+      <h3>Token odds by age</h3>
+      <svg id="oddsChart" viewBox="0 0 320 170" role="img" aria-label="Token odds fall with age"></svg>
+      <p class="note" id="oddsNote"></p>
     </div>
     <div class="card">
       <h3>Farm economics</h3>
@@ -124,16 +129,14 @@
         <li>Capital tier by TVL: ≥ $1B $250 · ≥ $100M $150 · ≥ $10M $100 · else $50.</li>
         <li>Gas per transaction by chain: Ethereum $8 · Bitcoin $3 · Solana $0.05 · other chains $0.50. Each plan budgets gas for its whole transaction count (3 + one per hold week) and keeps one exit transaction in reserve.</li>
         <li>Hold: &lt; 180 days old 60 d · &lt; 365 d 45 d · older 30 d, across two weekly snapshots. Eight steps per protocol: wallet + gas budget, official-link setup, weekly logged action, hold, docs/points check, exit reserve, claim safety, verdict.</li>
-        <li>Expected farmer value = implied × 0.001% capture (1bp — a 5% airdrop split across ~5,000 farmers; change it in the sandbox). Implied already carries the launch odds, so odds are never applied twice. Verdict: <b>Farm</b> when expected value ≥ 20× gas, <b>Watch</b> ≥ 5×, else <b>Skip</b>.</li>
+        <li>Expected drop = implied × 0.5bp capture (a 5% airdrop split across ~10,000 farmers; change it in the sandbox). Implied already carries the odds, so odds are never applied twice. Verdict prices the work: <b>Farm</b> when net of gas pays at least $25 an active hour, <b>Watch</b> at or above $0, else <b>Skip</b>.</li>
         <li><span id="planShapes"></span> distinct plan shapes across the board (category × chain × capital × hold × gas × verdict). Pin up to three rows on the board to compare them side by side.</li>
       </ul>
     </div>
     <div class="card">
       <h3>Model sandbox — change a constant, the board re-ranks</h3>
-      <label>Capture share <input id="sbCapture" type="number" step="0.000005" min="0" max="0.001" value="0.00001"> (farmer's share of implied value)</label>
-      <label>Growth weight <input id="sbGrowth" type="number" step="0.1" min="0" max="1" value="0.5"></label>
-      <label>Maturity floor <input id="sbMatFloor" type="number" step="0.05" min="0" max="1" value="0.6"></label>
-      <label>Maturity range <input id="sbMatRange" type="number" step="0.05" min="0" max="1" value="0.4"></label>
+      <label>Capture share <input id="sbCapture" type="number" step="0.0000025" min="0" max="0.001" value="0.000005"> (farmer's share of implied value)</label>
+      <label>Farm hurdle $/hour <input id="sbHurdle" type="number" step="5" min="0" max="200" value="25"></label>
       <button id="sbApply">Re-rank board</button>
       <button id="sbReset">Reset</button>
       <p class="note" id="sbNote">Sandbox only changes this page — board.json keeps the fitted model.</p>
